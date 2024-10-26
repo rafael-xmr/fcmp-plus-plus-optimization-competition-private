@@ -64,7 +64,7 @@ regardless of context.
 Please see the [list of approved dependencies](./dependencies). PRs are welcome
 and will be reviewed on a case-by-case basis.
 
-7) Submissions must not rely on tables built at compile-time.
+7) Submissions must not rely on tables built at time of compilation.
 
 8) Implementations must run in constant time.
 
@@ -80,24 +80,19 @@ constant cycle count when compiled for `wasm32-unknown-unknown`. This is
 incomprehensive to certain issues such as cache side-channel attacks, yet
 represents an automated way to eliminate some types of non-constant-time code.
 
-9) Submissions must not allocate more than 64 MB of RAM.
-
-This will be evaluated by the amount of pages allocated when run with
-`wasm-cycles`.
-
-10) Submissions may build a cache and store it in a static.
+9) Submissions may build a cache and store it in a static.
 
 The time to build the cache will be counted as part of the time for the
 benchmark to execute however.
 
-11) Submissions must pass the provided test suite and run with the provided
+10) Submissions must pass the provided test suite and run with the provided
     benchmark.
 
 Modifications to the test suite and benchmark are not allowed, except for
 adding/extended trait implementations for elliptic curves tested with the
 `ec-divisors` lib.
 
-12) Submissions must score at least 20% better than the reference.
+11) Submissions must score at least 20% better than the reference.
 
 This is the baseline performance improvement target intended to disqualify
 trivial submissions.
@@ -109,13 +104,14 @@ Submissions have a joint score based on:
 - Their benchmarks while running on a x64 sever
 - Their cycle count from `wasm-cycles`
 
-with a penalty applied based on the amount of WASM pages allocated. After
-96 MB of pages, each additional 32 MB of RAM applies a 10% penalty.
+Submissions which allocate more than 96 MB of WASM pages will have their score
+decreased by 10% for each additional 32 MB allocated (allocating 96.1 MB will
+face a 10% penalty and allocating 128.1 MB will face a 20% penalty).
 
 ### Prizes
 
 The best submission for an optimized `helioselene` will be awarded 50 XMR. The
 second best submissions will be awarded 25 XMR.
 
-The best solution for an optimized `ec-divisors` will be awarded 125 XMR. The
+The best solution for an optimized `ec-divisors` will be awarded 150 XMR. The
 second best submission will be awarded 75 XMR.
