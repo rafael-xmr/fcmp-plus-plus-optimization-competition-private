@@ -70,7 +70,7 @@ pub fn test_scalar_mul_divisors() {
 
 // Benchmark the reference implementation and the implementation in
 // ../ec-divisors-contest-src
-pub fn bench_scalar_mul_divisors(c: &mut Criterion) {
+fn run_bench_scalar_mul_divisors(c: &mut Criterion) {
     let mut group = c.benchmark_group("ec-divisors");
 
     let point = EdwardsPoint::generator();
@@ -93,5 +93,10 @@ pub fn bench_scalar_mul_divisors(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_scalar_mul_divisors);
+pub fn bench_scalar_mul_divisors() {
+    let mut c = Criterion::default();
+    run_bench_scalar_mul_divisors(&mut c);
+}
+
+criterion_group!(benches, run_bench_scalar_mul_divisors);
 criterion_main!(benches);

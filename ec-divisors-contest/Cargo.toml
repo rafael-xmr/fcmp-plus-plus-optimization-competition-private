@@ -7,19 +7,18 @@ edition = "2021"
 ec-divisors = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1", features = ["ed25519"] }
 ec-divisors-contest-src = { path = "./ec-divisors-contest-src", version = "0.1", features = ["ed25519"] }
 
+ciphersuite = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.4", features = ["ed25519"] }
 dalek-ff-group = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", default-features = false, optional = true }
 std-shims = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "^0.1.1", default-features = false }
 
 ff = { version = "0.13", default-features = false, features = ["bits"] }
 group = { version = "0.13", default-features = false }
 hex = { version = "0.4", default-features = false, optional = true }
+rand_core = { version = "0.6", features = ["getrandom"] }
 subtle = { version = "2", default-features = false }
 zeroize = { version = "^1.5", default-features = false, features = ["zeroize_derive"] }
 
 criterion = { version = "0.3", features = ["html_reports"] }
-rand_core = { version = "0.6", features = ["getrandom"] }
-
-ciphersuite = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.4", features = ["ed25519"] }
 
 [features]
 std = ["std-shims/std", "zeroize/std", "subtle/std", "ff/std", "dalek-ff-group?/std"]
