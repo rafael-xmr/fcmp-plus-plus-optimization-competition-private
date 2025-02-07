@@ -12,51 +12,46 @@ use zeroize::Zeroizing;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-#[allow(non_snake_case)]
-fn scalar_mul_divisor_ref(A: &EdwardsPoint, scalar: &ScalarDecompositionRef<Scalar>) {
-    let _ = scalar.scalar_mul_divisor(*A);
+fn scalar_mul_divisor_ref(generator: &EdwardsPoint, scalar: &ScalarDecompositionRef<Scalar>) {
+    let _ = scalar.scalar_mul_divisor(*generator);
 }
 
-#[allow(non_snake_case)]
-fn scalar_mul_divisor_contest(A: &EdwardsPoint, scalar: &ScalarDecomposition<Scalar>) {
-    let _ = scalar.scalar_mul_divisor(*A);
+fn scalar_mul_divisor_contest(generator: &EdwardsPoint, scalar: &ScalarDecomposition<Scalar>) {
+    let _ = scalar.scalar_mul_divisor(*generator);
 }
 
-#[allow(non_snake_case)]
-fn init_ref(scalar: &Scalar) -> (EdwardsPoint, ScalarDecompositionRef<Scalar>) {
-    let G = EdwardsPoint::generator();
+fn init_ref(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecompositionRef<Scalar> {
     let scalar = ScalarDecompositionRef::new(*scalar).unwrap();
-    let point = Zeroizing::new(G * scalar.scalar());
+    let point = Zeroizing::new(*point * scalar.scalar());
     let (_, _) = <EdwardsPoint as DivisorCurveRef>::to_xy(*point).unwrap();
-    (G, scalar)
+    scalar
 }
 
-#[allow(non_snake_case)]
-fn init_contest(scalar: &Scalar) -> (EdwardsPoint, ScalarDecomposition<Scalar>) {
-    let G = EdwardsPoint::generator();
+fn init_contest(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecomposition<Scalar> {
     let scalar = ScalarDecomposition::new(*scalar).expect("failed scalar decompsition");
-    let point = Zeroizing::new(G * scalar.scalar());
+    let point = Zeroizing::new(*point * scalar.scalar());
     let (_, _) = <EdwardsPoint as DivisorCurve>::to_xy(*point).expect("zero scalar was decomposed");
-    (G, scalar)
+    scalar
 }
 
 fn bench_scalar_mul_divisors(c: &mut Criterion) {
     let mut group = c.benchmark_group("ec-divisors");
 
+    let point = EdwardsPoint::generator();
     let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut OsRng);
 
     // Get scalar decompositions
-    let (point_ref, scalar_ref) = init_ref(&rand_scalar);
-    let (point_contest, scalar_contest) = init_contest(&rand_scalar);
+    let scalar_ref = init_ref(&point, &rand_scalar);
+    let scalar_contest = init_contest(&point, &rand_scalar);
 
     // Run the benchmark for the reference implementation
     group.bench_function("reference-impl", |b| {
-        b.iter(|| scalar_mul_divisor_ref(&point_ref, &scalar_ref))
+        b.iter(|| scalar_mul_divisor_ref(&point, &scalar_ref))
     });
 
     // Run the benchmark for the contest implementation
     group.bench_function("contest-impl", |b| {
-        b.iter(|| scalar_mul_divisor_contest(&point_contest, &scalar_contest))
+        b.iter(|| scalar_mul_divisor_contest(&point, &scalar_contest))
     });
 
     group.finish();
