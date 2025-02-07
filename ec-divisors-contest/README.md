@@ -10,13 +10,16 @@ The goal of this competition is to get the benchmark in [`./benches/divisors.rs`
 to run as fast as possible, using your own implementation of
 ec-divisors-contest, fulfilling ALL requirements from [`../README.md`](../README.md).
 
-The reference implementation source code is provided in [`./src`](./src). You may modify
-all code in [`./src`](./src). The tests in [`./src/tests`](./src/tests) are provided for your
-convenience. You can alter those tests as you see fit. You do *not* have to pass
-the tests in [`./src/tests`](./src/tests).
+The reference implementation source code is provided in
+[`./ec-divisors-contest-src`](./ec-divisors-contest-src). You may modify all
+code in [`./ec-divisors-contest-src`](./ec-divisors-contest-src). The tests in
+[`./ec-divisors-contest-src/tests`](./ec-divisors-contest-src/tests) are
+provided for your convenience. You can alter those tests as you see fit. You do
+*not* have to pass the tests in [`./ec-divisors-contest-src/tests`](./ec-divisors-contest-src/tests).
 
-However, you *must* pass the test provided in [`./tests/divisors.rs`](./tests/divisors.rs). You may
-*not* modify [`/tests/divisors.rs`](./tests/divisors.rs).
+However, you *must* pass the test provided in [`./tests/divisors.rs`](./tests/divisors.rs).
+
+You may *not* modify anything outside of [`./ec-divisors-contest-src`](./ec-divisors-contest-src).
 
 You also may not modify [`./benches`](./benches). The benchmark must run as is (TODO: wasm target).
 
