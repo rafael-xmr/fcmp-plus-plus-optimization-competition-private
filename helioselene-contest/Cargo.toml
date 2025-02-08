@@ -9,6 +9,7 @@ helioselene-contest-src = { path = "./helioselene-contest-src", version = "0.1" 
 
 ff-group-tests = { git = "https://github.com/kayabaNerve/fcmp-plus-plus" }
 
+criterion = { version = "0.3", features = ["html_reports"] }
 rand_core = { version = "0.6", default-features = false }
 
 [[bench]]

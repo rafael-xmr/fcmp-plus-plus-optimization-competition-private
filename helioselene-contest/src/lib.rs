@@ -9,14 +9,9 @@ use helioselene_contest_src::{
 
 use rand_core::OsRng;
 
-fn test_gen_random_helios_scalar() -> (HelioseleneField, HelioseleneFieldRef) {
-    let a = HelioseleneField::random(&mut OsRng);
-    let a_ref = HelioseleneFieldRef::from_repr(a.to_repr()).expect("Failed to read scalar");
-    assert_eq!(a.to_repr(), a_ref.to_repr());
-    (a, a_ref)
-}
+use criterion::{criterion_group, criterion_main, Criterion};
 
-fn test_gen_random_helios_scalar_ref() -> (HelioseleneField, HelioseleneFieldRef) {
+fn test_gen_random_helios_scalar() -> (HelioseleneField, HelioseleneFieldRef) {
     let a_ref = HelioseleneFieldRef::random(&mut OsRng);
     let a = HelioseleneField::from_repr(a_ref.to_repr()).expect("Failed to read scalar");
     assert_eq!(a.to_repr(), a_ref.to_repr());
@@ -24,13 +19,6 @@ fn test_gen_random_helios_scalar_ref() -> (HelioseleneField, HelioseleneFieldRef
 }
 
 fn test_gen_random_selene_scalar() -> (Field25519, Field25519Ref) {
-    let a = Field25519::random(&mut OsRng);
-    let a_ref = Field25519Ref::from_repr(a.to_repr()).expect("Failed to read scalar");
-    assert_eq!(a.to_repr(), a_ref.to_repr());
-    (a, a_ref)
-}
-
-fn test_gen_random_selene_scalar_ref() -> (Field25519, Field25519Ref) {
     let a_ref = Field25519Ref::random(&mut OsRng);
     let a = Field25519::from_repr(a_ref.to_repr()).expect("Failed to read scalar");
     assert_eq!(a.to_repr(), a_ref.to_repr());
@@ -39,14 +27,6 @@ fn test_gen_random_selene_scalar_ref() -> (Field25519, Field25519Ref) {
 
 #[allow(non_snake_case)]
 fn test_gen_random_helios_point() -> (HeliosPoint, HeliosPointRef) {
-    let A = HeliosPoint::random(&mut OsRng);
-    let A_ref = HeliosPointRef::from_bytes(&A.to_bytes()).expect("Failed to read helios point");
-    assert_eq!(A.to_bytes(), A_ref.to_bytes());
-    (A, A_ref)
-}
-
-#[allow(non_snake_case)]
-fn test_gen_random_helios_point_ref() -> (HeliosPoint, HeliosPointRef) {
     let A_ref = HeliosPointRef::random(&mut OsRng);
     let A = HeliosPoint::from_bytes(&A_ref.to_bytes()).expect("Failed to read helios point");
     assert_eq!(A.to_bytes(), A_ref.to_bytes());
@@ -55,21 +35,13 @@ fn test_gen_random_helios_point_ref() -> (HeliosPoint, HeliosPointRef) {
 
 #[allow(non_snake_case)]
 fn test_gen_random_selene_point() -> (SelenePoint, SelenePointRef) {
-    let A = SelenePoint::random(&mut OsRng);
-    let A_ref = SelenePointRef::from_bytes(&A.to_bytes()).expect("Failed to read selene point");
-    assert_eq!(A.to_bytes(), A_ref.to_bytes());
-    (A, A_ref)
-}
-
-#[allow(non_snake_case)]
-fn test_gen_random_selene_point_ref() -> (SelenePoint, SelenePointRef) {
     let A_ref = SelenePointRef::random(&mut OsRng);
     let A = SelenePoint::from_bytes(&A_ref.to_bytes()).expect("Failed to read selene point");
     assert_eq!(A.to_bytes(), A_ref.to_bytes());
     (A, A_ref)
 }
 
-fn do_field_ops(
+fn test_field_ops(
     a: HelioseleneField,
     b: HelioseleneField,
     a_ref: HelioseleneFieldRef,
@@ -211,50 +183,9 @@ fn do_selene_point_ops(
     assert_eq!(res.to_bytes(), res_ref.to_bytes());
 }
 
-fn test_field_ops() {
-    // 1. Generate randoms with the contest impl
-    let (a, a_ref) = test_gen_random_helios_scalar();
-    let (b, b_ref) = test_gen_random_helios_scalar();
-    do_field_ops(a, b, a_ref, b_ref);
-
-    // 2. Now test generating randoms with the reference impl
-    let (a, a_ref) = test_gen_random_helios_scalar_ref();
-    let (b, b_ref) = test_gen_random_helios_scalar_ref();
-    do_field_ops(a, b, a_ref, b_ref);
-}
-
 #[allow(non_snake_case)]
-fn test_helios_point_ops() {
-    // 1. Generate randoms with the contest impl
-    let (A, A_ref) = test_gen_random_helios_point();
-    let (B, B_ref) = test_gen_random_helios_point();
-    let (s, s_ref) = test_gen_random_helios_scalar();
-    do_helios_point_ops(A, B, A_ref, B_ref, s, s_ref);
-
-    // 2. Now test generating randoms with the reference impl
-    let (A, A_ref) = test_gen_random_helios_point_ref();
-    let (B, B_ref) = test_gen_random_helios_point_ref();
-    let (s, s_ref) = test_gen_random_helios_scalar_ref();
-    do_helios_point_ops(A, B, A_ref, B_ref, s, s_ref);
-}
-
-#[allow(non_snake_case)]
-fn test_selene_point_ops() {
-    // 1. Generate randoms with the contest impl
-    let (A, A_ref) = test_gen_random_selene_point();
-    let (B, B_ref) = test_gen_random_selene_point();
-    let (s, s_ref) = test_gen_random_selene_scalar();
-    do_selene_point_ops(A, B, A_ref, B_ref, s, s_ref);
-
-    // 2. Now test generating randoms with the reference impl
-    let (A, A_ref) = test_gen_random_selene_point_ref();
-    let (B, B_ref) = test_gen_random_selene_point_ref();
-    let (s, s_ref) = test_gen_random_selene_scalar_ref();
-    do_selene_point_ops(A, B, A_ref, B_ref, s, s_ref);
-}
-
 pub fn test_helioselene() {
-    static N_ITERS: usize = 100;
+    static N_ITERS: usize = 1000;
 
     // Test field implementation first
     ff_group_tests::prime_field::test_prime_field_bits::<_, HelioseleneField>(&mut OsRng);
@@ -262,7 +193,9 @@ pub fn test_helioselene() {
     // Test that the implementation in ../helioselene-contest-src produces the
     // same results as the reference implementation
     for _ in 0..N_ITERS {
-        test_field_ops();
+        let (a, a_ref) = test_gen_random_helios_scalar();
+        let (b, b_ref) = test_gen_random_helios_scalar();
+        test_field_ops(a, b, a_ref, b_ref);
     }
 
     // Now test point implementations
@@ -270,18 +203,123 @@ pub fn test_helioselene() {
     // Helios
     ff_group_tests::group::test_prime_group_bits::<_, HeliosPoint>(&mut OsRng);
     for _ in 0..N_ITERS {
-        test_helios_point_ops();
+        let (A, A_ref) = test_gen_random_helios_point();
+        let (B, B_ref) = test_gen_random_helios_point();
+        let (s, s_ref) = test_gen_random_helios_scalar();
+        do_helios_point_ops(A, B, A_ref, B_ref, s, s_ref);
     }
     // Selene
     ff_group_tests::group::test_prime_group_bits::<_, SelenePoint>(&mut OsRng);
     for _ in 0..N_ITERS {
-        test_selene_point_ops();
+        let (A, A_ref) = test_gen_random_selene_point();
+        let (B, B_ref) = test_gen_random_selene_point();
+        let (s, s_ref) = test_gen_random_selene_scalar();
+        do_selene_point_ops(A, B, A_ref, B_ref, s, s_ref);
     }
 }
 
-pub fn bench_helioselene() {
-    // let mut c = Criterion::default();
+macro_rules! repeat_op {
+    ($op:expr, $count:expr) => {{
+        for _ in 0..$count {
+            let _ = $op;
+        }
+    }};
 }
 
-// criterion_group!(benches, run_bench_helioselene);
-// criterion_main!(benches);
+fn bench_field_ops(
+    c: &mut Criterion,
+    a: HelioseleneField,
+    b: HelioseleneField,
+    a_ref: HelioseleneFieldRef,
+    b_ref: HelioseleneFieldRef,
+) {
+    let mut group = c.benchmark_group("helioselene-field-ops");
+
+    // Add
+    let n_iters = 10000;
+    group.bench_function("field-add", |bn| {
+        bn.iter(|| repeat_op!(a + b, n_iters))
+    });
+    group.bench_function("field-add-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref + b_ref, n_iters))
+    });
+
+    // Mul
+    let n_iters = 1000;
+    group.bench_function("field-mul", |bn| {
+        bn.iter(|| repeat_op!(a * b, n_iters))
+    });
+    group.bench_function("field-mul-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref * b_ref, n_iters))
+    });
+
+    // Sub
+    let n_iters = 10000;
+    group.bench_function("field-sub", |bn| {
+        bn.iter(|| repeat_op!(a - b, n_iters))
+    });
+    group.bench_function("field-sub-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref - b_ref, n_iters))
+    });
+
+    // Square
+    let n_iters = 10000;
+    group.bench_function("field-sq", |bn| {
+        bn.iter(|| repeat_op!(a.square(), n_iters))
+    });
+    group.bench_function("field-sq-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.square(), n_iters))
+    });
+
+    // Double
+    let n_iters = 10000;
+    group.bench_function("field-dbl", |bn| {
+        bn.iter(|| repeat_op!(a.double(), n_iters))
+    });
+    group.bench_function("field-dbl-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.double(), n_iters))
+    });
+
+    // Invert
+    let n_iters = 100;
+    group.bench_function("field-inv", |bn| {
+        bn.iter(|| repeat_op!(a.invert().unwrap(), n_iters))
+    });
+    group.bench_function("field-inv-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.invert().unwrap(), n_iters))
+    });
+
+    // Sqrt
+    let n_iters = 100;
+    group.bench_function("field-sqrt", |bn| {
+        bn.iter(|| repeat_op!(a.square().sqrt().unwrap(), n_iters))
+    });
+    group.bench_function("field-sqrt-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.square().sqrt().unwrap(), n_iters))
+    });
+
+    // Pow
+    let n_iters = 100;
+    group.bench_function("field-pow", |bn| {
+        bn.iter(|| repeat_op!(a.pow(b), n_iters))
+    });
+    group.bench_function("field-pow-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.pow(b_ref), n_iters))
+    });
+
+    group.finish();
+}
+
+fn run_bench_helioselene(c: &mut Criterion) {
+    let (a, a_ref) = test_gen_random_helios_scalar();
+    let (b, b_ref) = test_gen_random_helios_scalar();
+    bench_field_ops(c, a, b, a_ref, b_ref);
+}
+
+pub fn bench_helioselene() {
+    let mut c = Criterion::default();
+    run_bench_helioselene(&mut c);
+}
+
+criterion_group!(benches, run_bench_helioselene);
+criterion_main!(benches);
