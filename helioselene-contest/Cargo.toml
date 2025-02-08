@@ -1,0 +1,16 @@
+[package]
+name = "helioselene-contest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+helioselene = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1" }
+helioselene-contest-src = { path = "./helioselene-contest-src", version = "0.1" }
+
+ff-group-tests = { git = "https://github.com/kayabaNerve/fcmp-plus-plus" }
+
+rand_core = { version = "0.6", default-features = false }
+
+[[bench]]
+name = "helioselene"
+harness = false
