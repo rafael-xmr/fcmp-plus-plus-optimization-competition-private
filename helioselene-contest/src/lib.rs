@@ -1,10 +1,12 @@
+#![allow(non_snake_case)]
+
 use helioselene::{
-    group::ff::Field as FieldRef, HeliosPoint as HeliosPointRef,
-    HelioseleneField as HelioseleneFieldRef, SelenePoint as SelenePointRef, Field25519 as Field25519Ref
+    group::ff::Field as FieldRef, Field25519 as Field25519Ref, HeliosPoint as HeliosPointRef,
+    HelioseleneField as HelioseleneFieldRef, SelenePoint as SelenePointRef,
 };
 use helioselene_contest_src::{
     group::{ff::PrimeField, Group, GroupEncoding},
-    HeliosPoint, HelioseleneField, SelenePoint, Field25519,
+    Field25519, HeliosPoint, HelioseleneField, SelenePoint,
 };
 
 use rand_core::OsRng;
@@ -25,7 +27,6 @@ fn test_gen_random_selene_scalar() -> (Field25519, Field25519Ref) {
     (a, a_ref)
 }
 
-#[allow(non_snake_case)]
 fn test_gen_random_helios_point() -> (HeliosPoint, HeliosPointRef) {
     let A_ref = HeliosPointRef::random(&mut OsRng);
     let A = HeliosPoint::from_bytes(&A_ref.to_bytes()).expect("Failed to read helios point");
@@ -33,7 +34,6 @@ fn test_gen_random_helios_point() -> (HeliosPoint, HeliosPointRef) {
     (A, A_ref)
 }
 
-#[allow(non_snake_case)]
 fn test_gen_random_selene_point() -> (SelenePoint, SelenePointRef) {
     let A_ref = SelenePointRef::random(&mut OsRng);
     let A = SelenePoint::from_bytes(&A_ref.to_bytes()).expect("Failed to read selene point");
@@ -103,8 +103,7 @@ fn test_field_ops(
     assert_eq!(res, res_ref);
 }
 
-#[allow(non_snake_case)]
-fn do_helios_point_ops(
+fn test_helios_point_ops(
     A: HeliosPoint,
     B: HeliosPoint,
     A_ref: HeliosPointRef,
@@ -112,6 +111,17 @@ fn do_helios_point_ops(
     s: HelioseleneField,
     s_ref: HelioseleneFieldRef,
 ) {
+    // Compress point
+    let A_bytes = A.to_bytes();
+    let A_ref_bytes = A_ref.to_bytes();
+    assert_eq!(A_bytes.len(), 32);
+    assert_eq!(A_ref_bytes.len(), 32);
+    assert_eq!(A_bytes, A_ref_bytes);
+
+    // De-compress point
+    assert_eq!(A_ref, HeliosPointRef::from_bytes(&A_ref_bytes).unwrap());
+    assert_eq!(A, HeliosPoint::from_bytes(&A_bytes).unwrap());
+
     // Add
     let res = A + B;
     let res_ref = A_ref + B_ref;
@@ -143,8 +153,7 @@ fn do_helios_point_ops(
     assert_eq!(res.to_bytes(), res_ref.to_bytes());
 }
 
-#[allow(non_snake_case)]
-fn do_selene_point_ops(
+fn test_selene_point_ops(
     A: SelenePoint,
     B: SelenePoint,
     A_ref: SelenePointRef,
@@ -152,6 +161,17 @@ fn do_selene_point_ops(
     s: Field25519,
     s_ref: Field25519Ref,
 ) {
+    // Compress point
+    let A_bytes = A.to_bytes();
+    let A_ref_bytes = A_ref.to_bytes();
+    assert_eq!(A_bytes.len(), 32);
+    assert_eq!(A_ref_bytes.len(), 32);
+    assert_eq!(A_bytes, A_ref_bytes);
+
+    // De-compress point
+    assert_eq!(A_ref, SelenePointRef::from_bytes(&A_ref_bytes).unwrap());
+    assert_eq!(A, SelenePoint::from_bytes(&A_bytes).unwrap());
+
     // Add
     let res = A + B;
     let res_ref = A_ref + B_ref;
@@ -183,7 +203,195 @@ fn do_selene_point_ops(
     assert_eq!(res.to_bytes(), res_ref.to_bytes());
 }
 
-#[allow(non_snake_case)]
+macro_rules! repeat_op {
+    ($op:expr, $n_iters:expr) => {{
+        for _ in 0..$n_iters {
+            let _ = $op;
+        }
+    }};
+}
+
+fn bench_field_ops(
+    c: &mut Criterion,
+    a: HelioseleneField,
+    b: HelioseleneField,
+    a_ref: HelioseleneFieldRef,
+    b_ref: HelioseleneFieldRef,
+) {
+    let mut group = c.benchmark_group("helioselene-field-ops");
+
+    // Add
+    let n_iters = 1000000;
+    group.bench_function("field-add", |bn| bn.iter(|| repeat_op!(a + b, n_iters)));
+    group.bench_function("field-add-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref + b_ref, n_iters))
+    });
+
+    // Mul
+    let n_iters = 300000;
+    group.bench_function("field-mul", |bn| bn.iter(|| repeat_op!(a * b, n_iters)));
+    group.bench_function("field-mul-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref * b_ref, n_iters))
+    });
+
+    // Sub
+    let n_iters = 1000000;
+    group.bench_function("field-sub", |bn| bn.iter(|| repeat_op!(a - b, n_iters)));
+    group.bench_function("field-sub-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref - b_ref, n_iters))
+    });
+
+    // Square
+    let n_iters = 300000;
+    group.bench_function("field-sq", |bn| bn.iter(|| repeat_op!(a.square(), n_iters)));
+    group.bench_function("field-sq-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.square(), n_iters))
+    });
+
+    // Double
+    let n_iters = 1000000;
+    group.bench_function("field-dbl", |bn| {
+        bn.iter(|| repeat_op!(a.double(), n_iters))
+    });
+    group.bench_function("field-dbl-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.double(), n_iters))
+    });
+
+    // Invert
+    let n_iters = 1000;
+    group.bench_function("field-inv", |bn| {
+        bn.iter(|| repeat_op!(a.invert().unwrap(), n_iters))
+    });
+    group.bench_function("field-inv-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.invert().unwrap(), n_iters))
+    });
+
+    // Sqrt
+    let n_iters = 500;
+    group.bench_function("field-sqrt", |bn| {
+        bn.iter(|| repeat_op!(a.square().sqrt().unwrap(), n_iters))
+    });
+    group.bench_function("field-sqrt-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.square().sqrt().unwrap(), n_iters))
+    });
+
+    // Pow
+    let n_iters = 500;
+    group.bench_function("field-pow", |bn| bn.iter(|| repeat_op!(a.pow(b), n_iters)));
+    group.bench_function("field-pow-ref", |bn| {
+        bn.iter(|| repeat_op!(a_ref.pow(b_ref), n_iters))
+    });
+
+    group.finish();
+}
+
+fn bench_helios_point_ops(
+    c: &mut Criterion,
+    A: HeliosPoint,
+    B: HeliosPoint,
+    A_ref: HeliosPointRef,
+    B_ref: HeliosPointRef,
+    s: HelioseleneField,
+    s_ref: HelioseleneFieldRef,
+) {
+    let mut group = c.benchmark_group("helios-point-ops");
+
+    // Add
+    let n_iters = 10000;
+    group.bench_function("helios-add", |bn| bn.iter(|| repeat_op!(A + B, n_iters)));
+    group.bench_function("helios-add-ref", |bn| {
+        bn.iter(|| repeat_op!(A_ref + B_ref, n_iters))
+    });
+
+    // Mul
+    let n_iters = 50;
+    group.bench_function("helios-mul", |bn| bn.iter(|| repeat_op!(A * s, n_iters)));
+    group.bench_function("helios-mul-ref", |bn| {
+        bn.iter(|| repeat_op!(A_ref * s_ref, n_iters))
+    });
+
+    // Mul by generator
+    let n_iters = 50;
+    group.bench_function("helios-mul-gen", |bn| {
+        bn.iter(|| repeat_op!(HeliosPoint::generator() * s, n_iters))
+    });
+    group.bench_function("helios-mul-gen-ref", |bn| {
+        bn.iter(|| repeat_op!(HeliosPointRef::generator() * s_ref, n_iters))
+    });
+
+    // Sub
+    let n_iters = 10000;
+    group.bench_function("helios-sub", |bn| bn.iter(|| repeat_op!(A - B, n_iters)));
+    group.bench_function("helios-sub-ref", |bn| {
+        bn.iter(|| repeat_op!(A_ref - B_ref, n_iters))
+    });
+
+    // Double
+    let n_iters = 10000;
+    group.bench_function("helios-dbl", |bn| {
+        bn.iter(|| repeat_op!(A.double(), n_iters))
+    });
+    group.bench_function("helios-dbl-ref", |bn| {
+        bn.iter(|| repeat_op!(A_ref.double(), n_iters))
+    });
+
+    group.finish();
+}
+
+fn bench_selene_point_ops(
+    c: &mut Criterion,
+    A: SelenePoint,
+    B: SelenePoint,
+    A_ref: SelenePointRef,
+    B_ref: SelenePointRef,
+    s: Field25519,
+    s_ref: Field25519Ref,
+) {
+    let mut group = c.benchmark_group("selene-point-ops");
+
+    // Add
+    let n_iters = 10000;
+    group.bench_function("selene-add", |bn| bn.iter(|| repeat_op!(A + B, n_iters)));
+    group.bench_function("selene-add-ref", |bn| {
+        bn.iter(|| repeat_op!(A_ref + B_ref, n_iters))
+    });
+
+    // Mul
+    let n_iters = 50;
+    group.bench_function("selene-mul", |bn| bn.iter(|| repeat_op!(A * s, n_iters)));
+    group.bench_function("selene-mul-ref", |bn| {
+        bn.iter(|| repeat_op!(A_ref * s_ref, n_iters))
+    });
+
+    // Mul by generator
+    let n_iters = 50;
+    group.bench_function("selene-mul-gen", |bn| {
+        bn.iter(|| repeat_op!(SelenePoint::generator() * s, n_iters))
+    });
+    group.bench_function("selene-mul-gen-ref", |bn| {
+        bn.iter(|| repeat_op!(SelenePointRef::generator() * s_ref, n_iters))
+    });
+
+    // Sub
+    let n_iters = 10000;
+    group.bench_function("selene-sub", |bn| bn.iter(|| repeat_op!(A - B, n_iters)));
+    group.bench_function("selene-sub-ref", |bn| {
+        bn.iter(|| repeat_op!(A_ref - B_ref, n_iters))
+    });
+
+    // Double
+    let n_iters = 10000;
+    group.bench_function("selene-dbl", |bn| {
+        bn.iter(|| repeat_op!(A.double(), n_iters))
+    });
+    group.bench_function("selene-dbl-ref", |bn| {
+        bn.iter(|| repeat_op!(A_ref.double(), n_iters))
+    });
+
+    group.finish();
+}
+
+// Test entrance
 pub fn test_helioselene() {
     static N_ITERS: usize = 1000;
 
@@ -206,114 +414,37 @@ pub fn test_helioselene() {
         let (A, A_ref) = test_gen_random_helios_point();
         let (B, B_ref) = test_gen_random_helios_point();
         let (s, s_ref) = test_gen_random_helios_scalar();
-        do_helios_point_ops(A, B, A_ref, B_ref, s, s_ref);
+        test_helios_point_ops(A, B, A_ref, B_ref, s, s_ref);
     }
+
     // Selene
     ff_group_tests::group::test_prime_group_bits::<_, SelenePoint>(&mut OsRng);
     for _ in 0..N_ITERS {
         let (A, A_ref) = test_gen_random_selene_point();
         let (B, B_ref) = test_gen_random_selene_point();
         let (s, s_ref) = test_gen_random_selene_scalar();
-        do_selene_point_ops(A, B, A_ref, B_ref, s, s_ref);
+        test_selene_point_ops(A, B, A_ref, B_ref, s, s_ref);
     }
 }
 
-macro_rules! repeat_op {
-    ($op:expr, $count:expr) => {{
-        for _ in 0..$count {
-            let _ = $op;
-        }
-    }};
-}
-
-fn bench_field_ops(
-    c: &mut Criterion,
-    a: HelioseleneField,
-    b: HelioseleneField,
-    a_ref: HelioseleneFieldRef,
-    b_ref: HelioseleneFieldRef,
-) {
-    let mut group = c.benchmark_group("helioselene-field-ops");
-
-    // Add
-    let n_iters = 10000;
-    group.bench_function("field-add", |bn| {
-        bn.iter(|| repeat_op!(a + b, n_iters))
-    });
-    group.bench_function("field-add-ref", |bn| {
-        bn.iter(|| repeat_op!(a_ref + b_ref, n_iters))
-    });
-
-    // Mul
-    let n_iters = 1000;
-    group.bench_function("field-mul", |bn| {
-        bn.iter(|| repeat_op!(a * b, n_iters))
-    });
-    group.bench_function("field-mul-ref", |bn| {
-        bn.iter(|| repeat_op!(a_ref * b_ref, n_iters))
-    });
-
-    // Sub
-    let n_iters = 10000;
-    group.bench_function("field-sub", |bn| {
-        bn.iter(|| repeat_op!(a - b, n_iters))
-    });
-    group.bench_function("field-sub-ref", |bn| {
-        bn.iter(|| repeat_op!(a_ref - b_ref, n_iters))
-    });
-
-    // Square
-    let n_iters = 10000;
-    group.bench_function("field-sq", |bn| {
-        bn.iter(|| repeat_op!(a.square(), n_iters))
-    });
-    group.bench_function("field-sq-ref", |bn| {
-        bn.iter(|| repeat_op!(a_ref.square(), n_iters))
-    });
-
-    // Double
-    let n_iters = 10000;
-    group.bench_function("field-dbl", |bn| {
-        bn.iter(|| repeat_op!(a.double(), n_iters))
-    });
-    group.bench_function("field-dbl-ref", |bn| {
-        bn.iter(|| repeat_op!(a_ref.double(), n_iters))
-    });
-
-    // Invert
-    let n_iters = 100;
-    group.bench_function("field-inv", |bn| {
-        bn.iter(|| repeat_op!(a.invert().unwrap(), n_iters))
-    });
-    group.bench_function("field-inv-ref", |bn| {
-        bn.iter(|| repeat_op!(a_ref.invert().unwrap(), n_iters))
-    });
-
-    // Sqrt
-    let n_iters = 100;
-    group.bench_function("field-sqrt", |bn| {
-        bn.iter(|| repeat_op!(a.square().sqrt().unwrap(), n_iters))
-    });
-    group.bench_function("field-sqrt-ref", |bn| {
-        bn.iter(|| repeat_op!(a_ref.square().sqrt().unwrap(), n_iters))
-    });
-
-    // Pow
-    let n_iters = 100;
-    group.bench_function("field-pow", |bn| {
-        bn.iter(|| repeat_op!(a.pow(b), n_iters))
-    });
-    group.bench_function("field-pow-ref", |bn| {
-        bn.iter(|| repeat_op!(a_ref.pow(b_ref), n_iters))
-    });
-
-    group.finish();
-}
-
+// Benchmark entrance
 fn run_bench_helioselene(c: &mut Criterion) {
+    // HelioseleneField
     let (a, a_ref) = test_gen_random_helios_scalar();
     let (b, b_ref) = test_gen_random_helios_scalar();
     bench_field_ops(c, a, b, a_ref, b_ref);
+
+    // HeliosPoint
+    let (A, A_ref) = test_gen_random_helios_point();
+    let (B, B_ref) = test_gen_random_helios_point();
+    let (s, s_ref) = test_gen_random_helios_scalar();
+    bench_helios_point_ops(c, A, B, A_ref, B_ref, s, s_ref);
+
+    // SelenePoint
+    let (A, A_ref) = test_gen_random_selene_point();
+    let (B, B_ref) = test_gen_random_selene_point();
+    let (s, s_ref) = test_gen_random_selene_scalar();
+    bench_selene_point_ops(c, A, B, A_ref, B_ref, s, s_ref);
 }
 
 pub fn bench_helioselene() {
