@@ -1,102 +1,89 @@
-use ec_divisors::{
-    DivisorCurve as DivisorCurveRef, Poly as PolyRef, ScalarDecomposition as ScalarDecompositionRef,
-};
-use ec_divisors_contest_src::{DivisorCurve, Poly, ScalarDecomposition};
+use ec_divisors::{DivisorCurve as DivisorCurveRef, ScalarDecomposition as ScalarDecompositionRef};
+use ec_divisors_contest_src::{DivisorCurve, ScalarDecomposition};
 
 use ciphersuite::{
     group::{ff::Field, Group},
     Ciphersuite, Ed25519,
 };
-use dalek_ff_group::{EdwardsPoint, FieldElement, Scalar};
+use dalek_ff_group::{EdwardsPoint, Scalar};
 
-use rand_core::OsRng;
 use zeroize::Zeroizing;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
 
-fn scalar_mul_divisor_ref(
-    generator: &EdwardsPoint,
-    scalar: &ScalarDecompositionRef<Scalar>,
-) -> PolyRef<FieldElement> {
-    scalar.scalar_mul_divisor(*generator)
-}
-
-fn scalar_mul_divisor_contest(
-    generator: &EdwardsPoint,
-    scalar: &ScalarDecomposition<Scalar>,
-) -> Poly<FieldElement> {
-    scalar.scalar_mul_divisor(*generator)
-}
-
-fn init_ref(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecompositionRef<Scalar> {
+pub fn init_ref(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecompositionRef<Scalar> {
     let scalar = ScalarDecompositionRef::new(*scalar).unwrap();
     let point = Zeroizing::new(*point * scalar.scalar());
     let (_, _) = <EdwardsPoint as DivisorCurveRef>::to_xy(*point).unwrap();
     scalar
 }
 
-fn init_contest(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecomposition<Scalar> {
+pub fn init_contest(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecomposition<Scalar> {
     let scalar = ScalarDecomposition::new(*scalar).expect("failed scalar decompsition");
     let point = Zeroizing::new(*point * scalar.scalar());
     let (_, _) = <EdwardsPoint as DivisorCurve>::to_xy(*point).expect("zero scalar was decomposed");
     scalar
 }
 
-// Test that the implementation in ../ec-divisors-contest-src produces the same
-// result as the reference implementation
-pub fn test_scalar_mul_divisors() {
-    static N_ITERS: usize = 20;
+#[cfg(target_arch = "wasm32")]
+use getrandom::{register_custom_getrandom, Error};
+#[cfg(target_arch = "wasm32")]
+use rand_core::RngCore;
 
-    for i in 0..N_ITERS {
-        println!("Testing with random scalar {} / {}", i + 1, N_ITERS);
+static mut RNG_SEED: [u8; 32] = [0xff; 32];
 
-        let point = EdwardsPoint::generator();
-        let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut OsRng);
-
-        // Get scalar decompositions
-        let scalar_ref = init_ref(&point, &rand_scalar);
-        let scalar_contest = init_contest(&point, &rand_scalar);
-
-        // Get divisors
-        let ref_res = scalar_mul_divisor_ref(&point, &scalar_ref);
-        let res = scalar_mul_divisor_contest(&point, &scalar_contest);
-
-        assert_eq!(ref_res.y_coefficients, res.y_coefficients);
-        assert_eq!(ref_res.yx_coefficients, res.yx_coefficients);
-        assert_eq!(ref_res.x_coefficients, res.x_coefficients);
-        assert_eq!(ref_res.zero_coefficient, res.zero_coefficient);
-    }
+// https://forum.dfinity.org/t/module-imports-function-wbindgen-describe-from-wbindgen-placeholder-that-is-not-exported-by-the-runtime/11545/8
+#[cfg(target_arch = "wasm32")]
+pub fn custom_getrandom(buf: &mut [u8]) -> Result<(), Error> {
+    let mut rng = unsafe { ChaCha20Rng::from_seed(RNG_SEED) };
+    rng.fill_bytes(buf);
+    Ok(())
 }
 
-// Benchmark the reference implementation and the implementation in
-// ../ec-divisors-contest-src
-fn run_bench_scalar_mul_divisors(c: &mut Criterion) {
-    let mut group = c.benchmark_group("ec-divisors");
+#[cfg(target_arch = "wasm32")]
+register_custom_getrandom!(custom_getrandom);
 
+// Tests for https://github.com/kayabaNerve/wasm-cycles
+#[no_mangle]
+pub extern "C" fn case_scalar_mul_divisor_ref1() {
+    unsafe { RNG_SEED = [0xff; 32] };
+}
+
+#[no_mangle]
+pub extern "C" fn case_scalar_mul_divisor_ref2() {
+    unsafe { RNG_SEED = [0xde; 32] };
+}
+
+#[no_mangle]
+pub extern "C" fn case_scalar_mul_divisor_contest1() {
+    unsafe { RNG_SEED = [0xff; 32] };
+}
+
+#[no_mangle]
+pub extern "C" fn case_scalar_mul_divisor_contest2() {
+    unsafe { RNG_SEED = [0xde; 32] };
+}
+
+#[no_mangle]
+pub extern "C" fn test_scalar_mul_divisor_ref() {
+    // Makes sure reference impl is constant time
     let point = EdwardsPoint::generator();
-    let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut OsRng);
-
-    // Get scalar decompositions
-    let scalar_ref = init_ref(&point, &rand_scalar);
-    let scalar_contest = init_contest(&point, &rand_scalar);
-
-    // Run the benchmark for the reference implementation
-    group.bench_function("reference-impl", |b| {
-        b.iter(|| scalar_mul_divisor_ref(&point, &scalar_ref))
-    });
-
-    // Run the benchmark for the contest implementation
-    group.bench_function("contest-impl", |b| {
-        b.iter(|| scalar_mul_divisor_contest(&point, &scalar_contest))
-    });
-
-    group.finish();
+    let mut rng = unsafe { ChaCha20Rng::from_seed(RNG_SEED) };
+    let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut rng);
+    // FIXME: wasm-cycles fails because of the scalar decomposition in this line, even when using an equivalent RNG_SEED across cases
+    let _ = core::hint::black_box(init_ref(&point, &rand_scalar));
+    // FIXME: uncomment below
+    // core::hint::black_box(scalar.scalar_mul_divisor(point));
 }
 
-pub fn bench_scalar_mul_divisors() {
-    let mut c = Criterion::default();
-    run_bench_scalar_mul_divisors(&mut c);
+#[no_mangle]
+pub extern "C" fn test_scalar_mul_divisor_contest() {
+    let point = EdwardsPoint::generator();
+    let mut rng = unsafe { ChaCha20Rng::from_seed(RNG_SEED) };
+    let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut rng);
+    // FIXME: wasm-cycles fails because of the scalar decomposition in this line, even when using an equivalent RNG_SEED across cases
+    let _ = core::hint::black_box(init_contest(&point, &rand_scalar));
+    // FIXME: uncomment below
+    // core::hint::black_box(scalar.scalar_mul_divisor(point));
 }
-
-criterion_group!(benches, run_bench_scalar_mul_divisors);
-criterion_main!(benches);

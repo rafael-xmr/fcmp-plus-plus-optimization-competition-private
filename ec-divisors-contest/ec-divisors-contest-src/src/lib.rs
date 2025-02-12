@@ -510,7 +510,6 @@ mod pasta {
   }
 }
 
-#[cfg(any(test, feature = "ed25519"))]
 mod ed25519 {
   use subtle::{Choice, ConditionallySelectable};
   use group::{

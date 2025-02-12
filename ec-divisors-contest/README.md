@@ -11,8 +11,8 @@ to run as fast as possible, using your own implementation of
 ec-divisors-contest, fulfilling ALL requirements from [`../README.md`](../README.md).
 
 The reference implementation source code is provided in
-[`./ec-divisors-contest-src`](./ec-divisors-contest-src). You may modify all
-code in [`./ec-divisors-contest-src`](./ec-divisors-contest-src). The tests in
+[`./ec-divisors-contest-src`](./ec-divisors-contest-src). You may modify all of
+[`./ec-divisors-contest-src`](./ec-divisors-contest-src). The tests in
 [`./ec-divisors-contest-src/tests`](./ec-divisors-contest-src/tests) are
 provided for your convenience. You can alter those tests as you see fit. You do
 *not* have to pass the tests in [`./ec-divisors-contest-src/tests`](./ec-divisors-contest-src/tests).
@@ -30,13 +30,13 @@ Again, please read ALL contest requirements carefully at [`../README.md`](../REA
 To run the benchmark, use the command:
 
 ```
-cargo +1.69.0 bench --features ed25519
+cargo +1.69.0 bench
 ```
 
 To run the tests, use the command:
 
 ```
-cargo +1.69.0 test --release --test divisors --features ed25519 -- divisors_contest_test --exact --nocapture
+cargo +1.69.0 test --release
 ```
 
 Remember, your code must improve the benchmark by at least 20% in order to
