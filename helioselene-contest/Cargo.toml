@@ -7,11 +7,18 @@ edition = "2021"
 helioselene = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1" }
 helioselene-contest-src = { path = "./helioselene-contest-src", version = "0.1" }
 
-ff-group-tests = { git = "https://github.com/kayabaNerve/fcmp-plus-plus" }
+rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
+getrandom = { version = "0.2", features = ["custom"]}
+rand_chacha = { version = "0.3", default-features = false }
+paste = "1.0.15"
 
+[dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
-rand_core = { version = "0.6", default-features = false }
+ff-group-tests = { git = "https://github.com/kayabaNerve/fcmp-plus-plus" }
 
 [[bench]]
 name = "helioselene"
 harness = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
