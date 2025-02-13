@@ -47,9 +47,6 @@ pub fn test_gen_random_selene_point() -> (SelenePoint, SelenePointRef) {
 #[cfg(target_arch = "wasm32")]
 use getrandom::{register_custom_getrandom, Error};
 
-// TODO: don't make this global
-static mut RNG_SEED: [u8; 32] = [0xff; 32];
-
 // https://forum.dfinity.org/t/module-imports-function-wbindgen-describe-from-wbindgen-placeholder-that-is-not-exported-by-the-runtime/11545/8
 #[cfg(target_arch = "wasm32")]
 pub fn custom_getrandom(_buf: &mut [u8]) -> Result<(), Error> {
@@ -60,60 +57,59 @@ pub fn custom_getrandom(_buf: &mut [u8]) -> Result<(), Error> {
 register_custom_getrandom!(custom_getrandom);
 
 // Tests for https://github.com/kayabaNerve/wasm-cycles
-fn init_ref_helios_scalars() -> (HelioseleneFieldRef, HelioseleneFieldRef) {
-    let mut rng = unsafe { ChaCha20Rng::from_seed(RNG_SEED) };
+fn init_ref_helios_scalars(rng_seed: [u8; 32]) -> (HelioseleneFieldRef, HelioseleneFieldRef) {
+    let mut rng = ChaCha20Rng::from_seed(rng_seed);
     let a = HelioseleneFieldRef::random(&mut rng);
     let b = HelioseleneFieldRef::random(&mut rng);
     (a, b)
 }
 
-fn init_contest_helios_scalars() -> (HelioseleneField, HelioseleneField) {
-    let mut rng = unsafe { ChaCha20Rng::from_seed(RNG_SEED) };
+fn init_contest_helios_scalars(rng_seed: [u8; 32]) -> (HelioseleneField, HelioseleneField) {
+    let mut rng = ChaCha20Rng::from_seed(rng_seed);
     let a = HelioseleneField::random(&mut rng);
     let b = HelioseleneField::random(&mut rng);
     (a, b)
 }
 
-fn init_ref_selene_scalars() -> (Field25519Ref, Field25519Ref) {
-    let mut rng = unsafe { ChaCha20Rng::from_seed(RNG_SEED) };
+fn init_ref_selene_scalars(rng_seed: [u8; 32]) -> (Field25519Ref, Field25519Ref) {
+    let mut rng = ChaCha20Rng::from_seed(rng_seed);
     let a = Field25519Ref::random(&mut rng);
     let b = Field25519Ref::random(&mut rng);
     (a, b)
 }
 
-fn init_contest_selene_scalars() -> (Field25519, Field25519) {
-    let mut rng = unsafe { ChaCha20Rng::from_seed(RNG_SEED) };
+fn init_contest_selene_scalars(rng_seed: [u8; 32]) -> (Field25519, Field25519) {
+    let mut rng = ChaCha20Rng::from_seed(rng_seed);
     let a = Field25519::random(&mut rng);
     let b = Field25519::random(&mut rng);
     (a, b)
 }
 
-// Get random scalar first and mul by G to guarantee constant time
-fn init_ref_helios_points() -> (HeliosPointRef, HeliosPointRef) {
-    let (a, b) = init_ref_helios_scalars();
-    let A = HeliosPointRef::generator() * a;
-    let B = HeliosPointRef::generator() * b;
+fn init_ref_helios_points(rng_seed: [u8; 32]) -> (HeliosPointRef, HeliosPointRef) {
+    let mut rng = ChaCha20Rng::from_seed(rng_seed);
+    let A = HeliosPointRef::random(&mut rng);
+    let B = HeliosPointRef::random(&mut rng);
     (A, B)
 }
 
-fn init_contest_helios_points() -> (HeliosPoint, HeliosPoint) {
-    let (a, b) = init_contest_helios_scalars();
-    let A = HeliosPoint::generator() * a;
-    let B = HeliosPoint::generator() * b;
+fn init_contest_helios_points(rng_seed: [u8; 32]) -> (HeliosPoint, HeliosPoint) {
+    let mut rng = ChaCha20Rng::from_seed(rng_seed);
+    let A = HeliosPoint::random(&mut rng);
+    let B = HeliosPoint::random(&mut rng);
     (A, B)
 }
 
-fn init_ref_selene_points() -> (SelenePointRef, SelenePointRef) {
-    let (a, b) = init_ref_selene_scalars();
-    let A = SelenePointRef::generator() * a;
-    let B = SelenePointRef::generator() * b;
+fn init_ref_selene_points(rng_seed: [u8; 32]) -> (SelenePointRef, SelenePointRef) {
+    let mut rng = ChaCha20Rng::from_seed(rng_seed);
+    let A = SelenePointRef::random(&mut rng);
+    let B = SelenePointRef::random(&mut rng);
     (A, B)
 }
 
-fn init_contest_selene_points() -> (SelenePoint, SelenePoint) {
-    let (a, b) = init_contest_selene_scalars();
-    let A = SelenePoint::generator() * a;
-    let B = SelenePoint::generator() * b;
+fn init_contest_selene_points(rng_seed: [u8; 32]) -> (SelenePoint, SelenePoint) {
+    let mut rng = ChaCha20Rng::from_seed(rng_seed);
+    let A = SelenePoint::random(&mut rng);
+    let B = SelenePoint::random(&mut rng);
     (A, B)
 }
 
@@ -131,9 +127,9 @@ macro_rules! curve_test_params {
             }
 
             impl $StructName {
-                pub fn new() -> Self {
-                    let (s1, s2) = [<init_ $test_type _ $point_type _scalars>]();
-                    let (A, B) = [<init_ $test_type _ $point_type _points>]();
+                pub fn new(rng_seed: [u8; 32]) -> Self {
+                    let (s1, s2) = [<init_ $test_type _ $point_type _scalars>](rng_seed);
+                    let (A, B) = [<init_ $test_type _ $point_type _points>](rng_seed);
                     Self {
                         s1,
                         s2,
@@ -143,7 +139,7 @@ macro_rules! curve_test_params {
                 }
             }
 
-            static mut $STRUCT_VAR_NAME: LazyLock<$StructName> = LazyLock::new(|| $StructName::new());
+            static mut $STRUCT_VAR_NAME: LazyLock<$StructName> = LazyLock::new(|| $StructName::new([0xff; 32]));
         }
     }
 }
@@ -154,21 +150,20 @@ curve_test_params!(SeleneTestParamsRef, SELENE_TEST_PARAMS_REF, selene, SelenePo
 curve_test_params!(HeliosTestParams, HELIOS_TEST_PARAMS, helios, HeliosPoint, HelioseleneField, contest);
 curve_test_params!(SeleneTestParams, SELENE_TEST_PARAMS, selene, SelenePoint, Field25519, contest);
 
+// Use different rng seeds across cases
 macro_rules! define_case {
     ($fn_name:ident, $STRUCT_VAR_NAME:ident, $StructName:ident) => {
         paste! {
             #[no_mangle]
             pub extern "C" fn [<case_ $fn_name _1>]() {
-                unsafe { RNG_SEED =  [0xff; 32]};
-                unsafe { $STRUCT_VAR_NAME = LazyLock::new(|| $StructName::new()) };
+                unsafe { $STRUCT_VAR_NAME = LazyLock::new(|| $StructName::new([0xff; 32])) };
                 // Read to initialize the struct
                 let _ = unsafe { $STRUCT_VAR_NAME.s1 };
             }
 
             #[no_mangle]
             pub extern "C" fn [<case_ $fn_name _2>]() {
-                unsafe { RNG_SEED =  [0xde; 32]};
-                unsafe { $STRUCT_VAR_NAME = LazyLock::new(|| $StructName::new()) };
+                unsafe { $STRUCT_VAR_NAME = LazyLock::new(|| $StructName::new([0xde; 32])) };
                 // Read to initialize the struct
                 let _ = unsafe { $STRUCT_VAR_NAME.s1 };
             }
