@@ -16,6 +16,8 @@ use rand_core::SeedableRng;
 
 use paste::paste;
 
+use std::sync::LazyLock;
+
 pub fn test_gen_random_helios_scalar() -> (HelioseleneField, HelioseleneFieldRef) {
     let a_ref = HelioseleneFieldRef::random(&mut OsRng);
     let a = HelioseleneField::from_repr(a_ref.to_repr()).expect("Failed to read scalar");
@@ -113,8 +115,6 @@ fn init_contest_selene_points(rng_seed: [u8; 32]) -> (SelenePoint, SelenePoint) 
     (A, B)
 }
 
-use std::sync::LazyLock;
-
 macro_rules! curve_test_params {
     ($StructName:ident, $STRUCT_VAR_NAME:ident, $point_type: ident, $PointType:ident, $ScalarType:ident, $test_type:ident) => {
         paste! {
@@ -144,11 +144,39 @@ macro_rules! curve_test_params {
     }
 }
 
-curve_test_params!(HeliosTestParamsRef, HELIOS_TEST_PARAMS_REF, helios, HeliosPointRef, HelioseleneFieldRef, ref);
-curve_test_params!(SeleneTestParamsRef, SELENE_TEST_PARAMS_REF, selene, SelenePointRef, Field25519Ref, ref);
+curve_test_params!(
+    HeliosTestParamsRef,
+    HELIOS_TEST_PARAMS_REF,
+    helios,
+    HeliosPointRef,
+    HelioseleneFieldRef,
+    ref
+);
+curve_test_params!(
+    SeleneTestParamsRef,
+    SELENE_TEST_PARAMS_REF,
+    selene,
+    SelenePointRef,
+    Field25519Ref,
+    ref
+);
 
-curve_test_params!(HeliosTestParams, HELIOS_TEST_PARAMS, helios, HeliosPoint, HelioseleneField, contest);
-curve_test_params!(SeleneTestParams, SELENE_TEST_PARAMS, selene, SelenePoint, Field25519, contest);
+curve_test_params!(
+    HeliosTestParams,
+    HELIOS_TEST_PARAMS,
+    helios,
+    HeliosPoint,
+    HelioseleneField,
+    contest
+);
+curve_test_params!(
+    SeleneTestParams,
+    SELENE_TEST_PARAMS,
+    selene,
+    SelenePoint,
+    Field25519,
+    contest
+);
 
 // Use different rng seeds across cases
 macro_rules! define_case {
@@ -355,7 +383,7 @@ macro_rules! define_point_tests {
     };
 }
 
-// Field wasm tests
+// Field wasm-cycles tests
 define_test_a_op_b!(helioselene_add, +);
 define_test_a_op_b!(helioselene_mul, *);
 define_test_a_op_b!(helioselene_sub, -);
@@ -368,6 +396,6 @@ define_cases!(helioselene_sqrt, HELIOS_TEST_PARAMS, HeliosTestParams);
 define_cases!(helioselene_pow, HELIOS_TEST_PARAMS, HeliosTestParams);
 define_cases!(helioselene_neg, HELIOS_TEST_PARAMS, HeliosTestParams);
 
-// Point wasm tests
+// Point wasm-cycles tests
 define_point_tests!(helios, HeliosPoint, HELIOS_TEST_PARAMS, HeliosTestParams);
 define_point_tests!(selene, SelenePoint, SELENE_TEST_PARAMS, SeleneTestParams);

@@ -463,7 +463,6 @@ impl<F: Zeroize + PrimeFieldBits> ScalarDecomposition<F> {
     // Create a divisor out of the points
     let res = new_divisor(&divisor_points).unwrap();
     divisor_points.zeroize();
-
     res
   }
 }
