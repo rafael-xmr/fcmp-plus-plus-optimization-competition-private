@@ -46,7 +46,7 @@ cargo +1.69.0 bench
 To run the wasm cycle counter:
 
 ```
-git clone https://github.com/j-berman/wasm-cycles
+git clone https://github.com/kayabaNerve/wasm-cycles
 cd wasm-cycles
 cargo +1.69.0 run --release -- ../fcmp-plus-plus-optimization-competition/ec-divisors-contest
 ```
