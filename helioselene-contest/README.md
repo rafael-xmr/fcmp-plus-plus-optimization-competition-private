@@ -48,15 +48,62 @@ cargo +1.69.0 bench
 To run the wasm cycle counter:
 
 ```
-git clone https://github.com/j-berman/wasm-cycles
+git clone https://github.com/kayabaNerve/wasm-cycles
 cd wasm-cycles
 cargo +1.69.0 run --release -- ../fcmp-plus-plus-optimization-competition/helioselene-contest
 ```
-
-TODO: determine how to weigh the different curve ops to arrive at "20% improvement."
 
 Remember, your code must improve BOTH the benchmark and wasm cycle count by at
 least 20% in order to qualify as a valid submission. It also must follow ALL
 requirements in [`../README.md`](../README.md).
 
 Good luck!
+
+## How your helioselene score is calculated
+
+The following operations are weighed as followed:
+
+| Operation  | % Weight |
+| ------------- | ------------- |
+| Selene Point Add  | 30%  |
+| Helios Point Add  | 20%  |
+| helioselene Mul  | 10%  |
+| helioselene Invert  | 10%  |
+| Selene Point Decompression  | 7.5%  |
+| Helios Point Decompression  | 7.5%  |
+| helioselene Add  | 5%  |
+| helioselene Sub  | 5%  |
+| Selene Point Mul  | 2.5%  |
+| Helios Point Mul  | 2.5%  |
+
+- For example, if you improve Selene Point Add by 67% and improve nothing else,
+your submission would qualify as a valid submission.
+    - 67% * 30% = 20.1% overall improvement.
+    - 20.1% > 20% minimum required improvement.
+
+- If you improve Selene Point Add by 50%, Helios Point Add by 30%, and improve
+nothing else, your submission would qualify as a valid submission.
+    - 50% * 30% = 15% overall improvement from improving Selene Point Add.
+    - 30% * 20% = 6% overall improvement from improving Helios Point Add.
+    - 21% > 20% minimum required improvement.
+
+- Some operations are used in others. For example, Selene Point Add is composed
+of helioselene Mul, helioselene Add, and helioselene Sub. Thus, if you improve
+helioselene Mul, then you would also improve Selene Point Add, and thus your
+overall improvement score would benefit.
+
+- The weights were determined based on their respective weights in functions
+intended for use in Monero. You can see flamegraphs for the relevant functions
+[here](https://github.com/j-berman/fcmp-plus-plus/blob/879ac2147f8b5f8b8663b144eb7f8edbebb84fde/crypto/fcmps/flamegraph_prove_and_verify.svg)
+and [here](https://github.com/j-berman/fcmp-plus-plus/blob/879ac2147f8b5f8b8663b144eb7f8edbebb84fde/crypto/fcmps/flamegraph_hash_grow.svg).
+    - These flamegraphs were constructed using [flamegraph](https://github.com/flamegraph-rs/flamegraph),
+    with the following commands:
+
+```
+CARGO_PROFILE_RELEASE_DEBUG=true cargo +1.84.1 flamegraph --release --unit-test --package full-chain-membership-proofs -- tests::flamegraph_prove_and_verify --exact --nocapture
+```
+```
+CARGO_PROFILE_RELEASE_DEBUG=true cargo +1.84.1 flamegraph --release --unit-test --package full-chain-membership-proofs -- tests::flamegraph_hash_grow --exact --nocapture
+```
+
+TODO: running the benchmark should produce the final weighted score.
