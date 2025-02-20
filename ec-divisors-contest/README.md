@@ -25,30 +25,44 @@ Again, please read ALL contest requirements carefully at [`../README.md`](../REA
 
 ## How to run the code
 
-First, make sure you have rust 1.69.0 installed.
+Caution: we use different versions of Rust in different circumstances. Please
+be mindful of this.
+
+First, make sure you have rust 1.69.0 and rust 1.84.1 installed.
 
 ```
 rustup install 1.69.0
+rustup install 1.84.1
+```
+
+Second, make sure you have the `wasm32v1-none` target installed.
+
+```
+rustup target add wasm32v1-none
 ```
 
 To run the tests:
 
 ```
 cargo +1.69.0 test --release
+cargo +1.84.1 test --release
 ```
 
-To run the benchmark:
+To run the benchmark, only use 1.84.1:
 
 ```
-cargo +1.69.0 bench
+cargo +1.84.1 bench
 ```
+
+If you have build conflict issues (as a result of switching compiler versions),
+you may need to remove `target/` and Cargo.lock, then run again.
 
 To run the wasm cycle counter:
 
 ```
 git clone https://github.com/kayabaNerve/wasm-cycles
 cd wasm-cycles
-cargo +1.69.0 run --release -- ../fcmp-plus-plus-optimization-competition/ec-divisors-contest
+cargo +1.84.1 run --release -- ../fcmp-plus-plus-optimization-competition/ec-divisors-contest +1.84.1
 ```
 
 Remember, your code must improve BOTH the benchmark and wasm cycle count by at

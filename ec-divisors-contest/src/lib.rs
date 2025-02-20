@@ -1,3 +1,6 @@
+#![no_std]
+#![allow(static_mut_refs)]
+
 use ec_divisors::{DivisorCurve as DivisorCurveRef, ScalarDecomposition as ScalarDecompositionRef};
 use ec_divisors_contest_src::{DivisorCurve, ScalarDecomposition};
 
@@ -12,7 +15,7 @@ use zeroize::Zeroizing;
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 
-use std::sync::LazyLock;
+use std_shims::sync::OnceLock;
 
 pub fn init_ref(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecompositionRef<Scalar> {
     let scalar = ScalarDecompositionRef::new(*scalar).unwrap();
@@ -28,8 +31,24 @@ pub fn init_contest(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecompositio
     scalar
 }
 
+// For error: no global memory allocator found but one is required; link to std or add `#[global_allocator]` to a static item that implements the GlobalAlloc trait
+// dlmalloc is the allocator used on wasm32-unknown-unknown: https://doc.rust-lang.org/rustc/platform-support/wasm32-unknown-unknown.html
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOCATOR: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
+
+#[cfg(target_arch = "wasm32")]
+use core::{unimplemented, result::{Result, Result::{Ok, Err}}, panic::PanicInfo};
+
 #[cfg(target_arch = "wasm32")]
 use getrandom::{register_custom_getrandom, Error};
+
+// For error: `#[panic_handler]` function required, but not found
+#[cfg(target_arch = "wasm32")]
+#[panic_handler]
+fn panic(_: &PanicInfo) -> ! {
+    loop {}
+}
 
 // https://forum.dfinity.org/t/module-imports-function-wbindgen-describe-from-wbindgen-placeholder-that-is-not-exported-by-the-runtime/11545/8
 #[cfg(target_arch = "wasm32")]
@@ -70,52 +89,58 @@ impl EcDivisorsParams {
     }
 }
 
-static mut EC_DIVISORS_PARAMS: LazyLock<EcDivisorsParams> =
-    LazyLock::new(|| EcDivisorsParams::new([0xff; 32]));
-static mut EC_DIVISORS_PARAMS_REF: LazyLock<EcDivisorsParamsRef> =
-    LazyLock::new(|| EcDivisorsParamsRef::new([0xff; 32]));
+static mut EC_DIVISORS_PARAMS: OnceLock<EcDivisorsParams> = OnceLock::new();
+static mut EC_DIVISORS_PARAMS_REF: OnceLock<EcDivisorsParamsRef> = OnceLock::new();
 
 // Tests using different seed with for https://github.com/kayabaNerve/wasm-cycles
 #[no_mangle]
 pub extern "C" fn case_scalar_mul_divisor_ref1() {
-    unsafe { EC_DIVISORS_PARAMS_REF = LazyLock::new(|| EcDivisorsParamsRef::new([0xff; 32])) };
-    let _ = unsafe { EC_DIVISORS_PARAMS_REF.point };
+    unsafe {
+        EC_DIVISORS_PARAMS_REF = OnceLock::new();
+        let _ = EC_DIVISORS_PARAMS_REF.get_or_init(|| EcDivisorsParamsRef::new([0xff; 32]));
+    };
 }
 
 #[no_mangle]
 pub extern "C" fn case_scalar_mul_divisor_ref2() {
-    unsafe { EC_DIVISORS_PARAMS_REF = LazyLock::new(|| EcDivisorsParamsRef::new([0xde; 32])) };
-    let _ = unsafe { EC_DIVISORS_PARAMS_REF.point };
+    unsafe {
+        EC_DIVISORS_PARAMS_REF = OnceLock::new();
+        let _ = EC_DIVISORS_PARAMS_REF.get_or_init(|| EcDivisorsParamsRef::new([0xde; 32]));
+    };
 }
 
 #[no_mangle]
 pub extern "C" fn case_scalar_mul_divisor_contest1() {
-    unsafe { EC_DIVISORS_PARAMS = LazyLock::new(|| EcDivisorsParams::new([0xff; 32])) };
-    let _ = unsafe { EC_DIVISORS_PARAMS.point };
+    unsafe {
+        EC_DIVISORS_PARAMS = OnceLock::new();
+        let _ = EC_DIVISORS_PARAMS.get_or_init(|| EcDivisorsParams::new([0xff; 32]));
+    };
 }
 
 #[no_mangle]
 pub extern "C" fn case_scalar_mul_divisor_contest2() {
-    unsafe { EC_DIVISORS_PARAMS = LazyLock::new(|| EcDivisorsParams::new([0xde; 32])) };
-    let _ = unsafe { EC_DIVISORS_PARAMS.point };
+    unsafe {
+        EC_DIVISORS_PARAMS = OnceLock::new();
+        let _ = EC_DIVISORS_PARAMS.get_or_init(|| EcDivisorsParams::new([0xde; 32]));
+    };
 }
 
 #[no_mangle]
 pub extern "C" fn test_scalar_mul_divisor_ref() {
-    #[allow(static_mut_refs)]
     core::hint::black_box(unsafe {
-        EC_DIVISORS_PARAMS_REF
+        let params = EC_DIVISORS_PARAMS_REF.get().unwrap();
+        params
             .scalar
-            .scalar_mul_divisor(EC_DIVISORS_PARAMS_REF.point)
+            .scalar_mul_divisor(params.point)
     });
 }
 
 #[no_mangle]
 pub extern "C" fn test_scalar_mul_divisor_contest() {
-    #[allow(static_mut_refs)]
     core::hint::black_box(unsafe {
-        EC_DIVISORS_PARAMS
+        let params = EC_DIVISORS_PARAMS.get().unwrap();
+        params
             .scalar
-            .scalar_mul_divisor(EC_DIVISORS_PARAMS.point)
+            .scalar_mul_divisor(params.point)
     });
 }

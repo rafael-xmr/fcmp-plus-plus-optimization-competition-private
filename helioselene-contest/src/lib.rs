@@ -1,4 +1,6 @@
+#![no_std]
 #![allow(non_snake_case)]
+#![allow(static_mut_refs)]
 
 use helioselene::{
     group::ff::Field as FieldRef, Field25519 as Field25519Ref, HeliosPoint as HeliosPointRef,
@@ -16,7 +18,8 @@ use rand_core::SeedableRng;
 
 use paste::paste;
 
-use std::sync::LazyLock;
+use std_shims::sync::OnceLock;
+use core::assert_eq;
 
 pub fn test_gen_random_helios_scalar() -> (HelioseleneField, HelioseleneFieldRef) {
     let a_ref = HelioseleneFieldRef::random(&mut OsRng);
@@ -46,8 +49,24 @@ pub fn test_gen_random_selene_point() -> (SelenePoint, SelenePointRef) {
     (A, A_ref)
 }
 
+// For error: no global memory allocator found but one is required; link to std or add `#[global_allocator]` to a static item that implements the GlobalAlloc trait
+// dlmalloc is the allocator used on wasm32-unknown-unknown: https://doc.rust-lang.org/rustc/platform-support/wasm32-unknown-unknown.html
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOCATOR: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
+
+#[cfg(target_arch = "wasm32")]
+use core::{unimplemented, result::{Result, Result::{Ok, Err}}, panic::PanicInfo};
+
 #[cfg(target_arch = "wasm32")]
 use getrandom::{register_custom_getrandom, Error};
+
+// For error: `#[panic_handler]` function required, but not found
+#[cfg(target_arch = "wasm32")]
+#[panic_handler]
+fn panic(_: &PanicInfo) -> ! {
+    loop {}
+}
 
 // https://forum.dfinity.org/t/module-imports-function-wbindgen-describe-from-wbindgen-placeholder-that-is-not-exported-by-the-runtime/11545/8
 #[cfg(target_arch = "wasm32")]
@@ -139,7 +158,7 @@ macro_rules! curve_test_params {
                 }
             }
 
-            static mut $STRUCT_VAR_NAME: LazyLock<$StructName> = LazyLock::new(|| $StructName::new([0xff; 32]));
+            static mut $STRUCT_VAR_NAME: OnceLock<$StructName> = OnceLock::new();
         }
     }
 }
@@ -184,16 +203,18 @@ macro_rules! define_case {
         paste! {
             #[no_mangle]
             pub extern "C" fn [<case_ $fn_name _1>]() {
-                unsafe { $STRUCT_VAR_NAME = LazyLock::new(|| $StructName::new([0xff; 32])) };
-                // Read to initialize the struct
-                let _ = unsafe { $STRUCT_VAR_NAME.s1 };
+                unsafe {
+                    $STRUCT_VAR_NAME = OnceLock::new();
+                    let _ = $STRUCT_VAR_NAME.get_or_init(|| $StructName::new([0xff; 32]));
+                };
             }
 
             #[no_mangle]
             pub extern "C" fn [<case_ $fn_name _2>]() {
-                unsafe { $STRUCT_VAR_NAME = LazyLock::new(|| $StructName::new([0xde; 32])) };
-                // Read to initialize the struct
-                let _ = unsafe { $STRUCT_VAR_NAME.s1 };
+                unsafe {
+                    $STRUCT_VAR_NAME = OnceLock::new();
+                    let _ = $STRUCT_VAR_NAME.get_or_init(|| $StructName::new([0xde; 32]));
+                };
             }
         }
     };
@@ -215,13 +236,13 @@ macro_rules! define_test_a_op_b {
 
             #[no_mangle]
             pub extern "C" fn [<test_ $fn_name _ref>]() {
-                let (a, b) = unsafe { (HELIOS_TEST_PARAMS_REF.s1, HELIOS_TEST_PARAMS_REF.s2) };
+                let (a, b) = unsafe { (HELIOS_TEST_PARAMS_REF.get().unwrap().s1, HELIOS_TEST_PARAMS_REF.get().unwrap().s2) };
                 let _ = core::hint::black_box(a $op b);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $fn_name _contest>]() {
-                let (a, b) = unsafe { (HELIOS_TEST_PARAMS.s1, HELIOS_TEST_PARAMS.s2) };
+                let (a, b) = unsafe { (HELIOS_TEST_PARAMS.get().unwrap().s1, HELIOS_TEST_PARAMS.get().unwrap().s2) };
                 let _ = core::hint::black_box(a $op b);
             }
         }
@@ -235,13 +256,13 @@ macro_rules! define_test_a_dot_method {
 
             #[no_mangle]
             pub extern "C" fn [<test_ $fn_name _ref>]() {
-                let a = unsafe { HELIOS_TEST_PARAMS_REF.s1 };
+                let a = unsafe { HELIOS_TEST_PARAMS_REF.get().unwrap().s1 };
                 let _ = core::hint::black_box(a.$method());
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $fn_name _contest>]() {
-                let a = unsafe { HELIOS_TEST_PARAMS.s1 };
+                let a = unsafe { HELIOS_TEST_PARAMS.get().unwrap().s1 };
                 let _ = core::hint::black_box(a.$method());
             }
         }
@@ -250,37 +271,37 @@ macro_rules! define_test_a_dot_method {
 
 #[no_mangle]
 pub extern "C" fn test_helioselene_sqrt_ref() {
-    let a = unsafe { HELIOS_TEST_PARAMS_REF.s1 };
+    let a = unsafe { HELIOS_TEST_PARAMS_REF.get().unwrap().s1 };
     let _ = core::hint::black_box(a.square().sqrt().unwrap());
 }
 
 #[no_mangle]
 pub extern "C" fn test_helioselene_sqrt_contest() {
-    let a = unsafe { HELIOS_TEST_PARAMS.s1 };
+    let a = unsafe { HELIOS_TEST_PARAMS.get().unwrap().s1 };
     let _ = core::hint::black_box(a.square().sqrt().unwrap());
 }
 
 #[no_mangle]
 pub extern "C" fn test_helioselene_pow_ref() {
-    let (a, b) = unsafe { (HELIOS_TEST_PARAMS_REF.s1, HELIOS_TEST_PARAMS_REF.s2) };
+    let (a, b) = unsafe { (HELIOS_TEST_PARAMS_REF.get().unwrap().s1, HELIOS_TEST_PARAMS_REF.get().unwrap().s2) };
     let _ = core::hint::black_box(a.pow(b));
 }
 
 #[no_mangle]
 pub extern "C" fn test_helioselene_pow_contest() {
-    let (a, b) = unsafe { (HELIOS_TEST_PARAMS.s1, HELIOS_TEST_PARAMS.s2) };
+    let (a, b) = unsafe { (HELIOS_TEST_PARAMS.get().unwrap().s1, HELIOS_TEST_PARAMS.get().unwrap().s2) };
     let _ = core::hint::black_box(a.pow(b));
 }
 
 #[no_mangle]
 pub extern "C" fn test_helioselene_neg_ref() {
-    let a = unsafe { HELIOS_TEST_PARAMS_REF.s1 };
+    let a = unsafe { HELIOS_TEST_PARAMS_REF.get().unwrap().s1 };
     let _ = core::hint::black_box(-a);
 }
 
 #[no_mangle]
 pub extern "C" fn test_helioselene_neg_contest() {
-    let a = unsafe { HELIOS_TEST_PARAMS.s1 };
+    let a = unsafe { HELIOS_TEST_PARAMS.get().unwrap().s1 };
     let _ = core::hint::black_box(-a);
 }
 
@@ -298,85 +319,85 @@ macro_rules! define_point_tests {
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _add_ref>]() {
-                let (A, B) = unsafe { ([<$STRUCT_VAR_NAME _REF>].A, [<$STRUCT_VAR_NAME _REF>].B) };
+                let (A, B) = unsafe { ([<$STRUCT_VAR_NAME _REF>].get().unwrap().A, [<$STRUCT_VAR_NAME _REF>].get().unwrap().B) };
                 let _ = core::hint::black_box(A + B);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _add_contest>]() {
-                let (A, B) = unsafe { ($STRUCT_VAR_NAME.A, $STRUCT_VAR_NAME.B) };
+                let (A, B) = unsafe { ($STRUCT_VAR_NAME.get().unwrap().A, $STRUCT_VAR_NAME.get().unwrap().B) };
                 let _ = core::hint::black_box(A + B);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _mul_ref>]() {
-                let (A, s) = unsafe { ([<$STRUCT_VAR_NAME _REF>].A, [<$STRUCT_VAR_NAME _REF>].s1) };
+                let (A, s) = unsafe { ([<$STRUCT_VAR_NAME _REF>].get().unwrap().A, [<$STRUCT_VAR_NAME _REF>].get().unwrap().s1) };
                 let _ = core::hint::black_box(A * s);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _mul_contest>]() {
-                let (A, s) = unsafe { ($STRUCT_VAR_NAME.A, $STRUCT_VAR_NAME.s1) };
+                let (A, s) = unsafe { ($STRUCT_VAR_NAME.get().unwrap().A, $STRUCT_VAR_NAME.get().unwrap().s1) };
                 let _ = core::hint::black_box(A * s);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _mul_by_generator_ref>]() {
-                let a = unsafe { [<$STRUCT_VAR_NAME _REF>].s1 };
+                let a = unsafe { [<$STRUCT_VAR_NAME _REF>].get().unwrap().s1 };
                 let _ = core::hint::black_box([<$PointType Ref>]::generator() * a);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _mul_by_generator_contest>]() {
-                let a = unsafe { $STRUCT_VAR_NAME.s1 };
+                let a = unsafe { $STRUCT_VAR_NAME.get().unwrap().s1 };
                 let _ = core::hint::black_box($PointType::generator() * a);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _sub_ref>]() {
-                let (A, B) = unsafe { ([<$STRUCT_VAR_NAME _REF>].A, [<$STRUCT_VAR_NAME _REF>].B) };
+                let (A, B) = unsafe { ([<$STRUCT_VAR_NAME _REF>].get().unwrap().A, [<$STRUCT_VAR_NAME _REF>].get().unwrap().B) };
                 let _ = core::hint::black_box(A - B);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _sub_contest>]() {
-                let (A, B) = unsafe { ($STRUCT_VAR_NAME.A, $STRUCT_VAR_NAME.B) };
+                let (A, B) = unsafe { ($STRUCT_VAR_NAME.get().unwrap().A, $STRUCT_VAR_NAME.get().unwrap().B) };
                 let _ = core::hint::black_box(A - B);
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _dbl_ref>]() {
-                let A = unsafe { [<$STRUCT_VAR_NAME _REF>].A };
+                let A = unsafe { [<$STRUCT_VAR_NAME _REF>].get().unwrap().A };
                 let _ = core::hint::black_box(A.double());
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _dbl_contest>]() {
-                let A = unsafe { $STRUCT_VAR_NAME.A };
+                let A = unsafe { $STRUCT_VAR_NAME.get().unwrap().A };
                 let _ = core::hint::black_box(A.double());
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _compression_ref>]() {
-                let A = unsafe { [<$STRUCT_VAR_NAME _REF>].A };
+                let A = unsafe { [<$STRUCT_VAR_NAME _REF>].get().unwrap().A };
                 let _ = core::hint::black_box(A.to_bytes());
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _compression_contest>]() {
-                let A = unsafe { $STRUCT_VAR_NAME.A };
+                let A = unsafe { $STRUCT_VAR_NAME.get().unwrap().A };
                 let _ = core::hint::black_box(A.to_bytes());
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _decompression_ref>]() {
-                let A = unsafe { [<$STRUCT_VAR_NAME _REF>].A };
+                let A = unsafe { [<$STRUCT_VAR_NAME _REF>].get().unwrap().A };
                 let _ = core::hint::black_box([<$PointType Ref>]::from_bytes(&A.to_bytes()).unwrap());
             }
 
             #[no_mangle]
             pub extern "C" fn [<test_ $point_name _decompression_contest>]() {
-                let A = unsafe { $STRUCT_VAR_NAME.A };
+                let A = unsafe { $STRUCT_VAR_NAME.get().unwrap().A };
                 let _ = core::hint::black_box($PointType::from_bytes(&A.to_bytes()).unwrap());
             }
         }

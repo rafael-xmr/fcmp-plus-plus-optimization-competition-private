@@ -4,17 +4,21 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ec-divisors = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1", features = ["ed25519"] }
-ec-divisors-contest-src = { path = "./ec-divisors-contest-src", version = "0.1" }
+ec-divisors = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1", default-features = false, features = ["ed25519"] }
+ec-divisors-contest-src = { path = "./ec-divisors-contest-src", version = "0.1", default-features = false }
+
+std-shims = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1", default-features = false }
 
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 getrandom = { version = "0.2", features = ["custom"]}
 rand_chacha = { version = "0.3", default-features = false }
 
-ciphersuite = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.4", features = ["ed25519"] }
+ciphersuite = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.4", default-features = false, features = ["alloc", "ed25519"] }
 dalek-ff-group = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", default-features = false }
 
 zeroize = { version = "^1.5", default-features = false, features = ["zeroize_derive"] }
+
+dlmalloc = { version = "0.2.8", features = ["global"] }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
@@ -25,3 +29,13 @@ harness = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[features]
+std = [
+    "ec-divisors/std",
+    "ec-divisors-contest-src/std",
+    "std-shims/std",
+    "rand_core/std",
+    "zeroize/std",
+]
+default = ["std"]

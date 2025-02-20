@@ -4,13 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-helioselene = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1" }
-helioselene-contest-src = { path = "./helioselene-contest-src", version = "0.1" }
+helioselene = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1", default-features = false }
+helioselene-contest-src = { path = "./helioselene-contest-src", version = "0.1", default-features = false }
+
+std-shims = { git = "https://github.com/kayabaNerve/fcmp-plus-plus", version = "0.1", default-features = false }
 
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 getrandom = { version = "0.2", features = ["custom"]}
 rand_chacha = { version = "0.3", default-features = false }
 paste = "1.0.15"
+dlmalloc = { version = "0.2.8", features = ["global"] }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
@@ -22,3 +25,12 @@ harness = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[features]
+std = [
+  "rand_core/std",
+
+  "helioselene/std",
+  "helioselene-contest-src/std",
+]
+default = ["std"]
