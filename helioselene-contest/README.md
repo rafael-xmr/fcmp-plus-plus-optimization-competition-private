@@ -64,7 +64,7 @@ To run the wasm cycle counter:
 ```
 git clone https://github.com/kayabaNerve/wasm-cycles
 cd wasm-cycles
-cargo +1.84.1 run --release -- ../fcmp-plus-plus-optimization-competition/ec-divisors-contest +1.84.1
+cargo +1.84.1 run --release -- ../fcmp-plus-plus-optimization-competition/helioselene-contest +1.84.1
 ```
 
 Remember, your code must improve BOTH the benchmark and wasm cycle count by at
