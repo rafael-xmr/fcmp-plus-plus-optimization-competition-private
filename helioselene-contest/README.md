@@ -106,18 +106,16 @@ of helioselene Mul, helioselene Add, and helioselene Sub. Thus, if you improve
 helioselene Mul, then you would also improve Selene Point Add, and thus your
 overall improvement score would benefit.
 
-- The weights were determined based on their respective weights in functions
+The weights were determined based on their respective weights in functions
 intended for use in Monero. You can see flamegraphs for the relevant functions
-[here](https://github.com/j-berman/fcmp-plus-plus/blob/879ac2147f8b5f8b8663b144eb7f8edbebb84fde/crypto/fcmps/flamegraph_prove_and_verify.svg)
-and [here](https://github.com/j-berman/fcmp-plus-plus/blob/879ac2147f8b5f8b8663b144eb7f8edbebb84fde/crypto/fcmps/flamegraph_hash_grow.svg).
-    - These flamegraphs were constructed using [flamegraph](https://github.com/flamegraph-rs/flamegraph),
-    with the following commands:
+[verify](https://raw.githubusercontent.com/j-berman/fcmp-plus-plus/760b7784c3b77a7f43329317448fe5bcbc00dfd3/crypto/fcmps/flamegraph_verify.svg),
+[hash_grow](https://raw.githubusercontent.com/j-berman/fcmp-plus-plus/760b7784c3b77a7f43329317448fe5bcbc00dfd3/crypto/fcmps/flamegraph_hash_grow.svg),
+and [prove](https://raw.githubusercontent.com/j-berman/fcmp-plus-plus/760b7784c3b77a7f43329317448fe5bcbc00dfd3/crypto/fcmps/flamegraph_prove.svg).
 
-```
-CARGO_PROFILE_RELEASE_DEBUG=true cargo +1.84.1 flamegraph --release --unit-test --package full-chain-membership-proofs -- tests::flamegraph_prove_and_verify --exact --nocapture
-```
-```
-CARGO_PROFILE_RELEASE_DEBUG=true cargo +1.84.1 flamegraph --release --unit-test --package full-chain-membership-proofs -- tests::flamegraph_hash_grow --exact --nocapture
-```
+- Hint: when looking at the images, if you cannot click into various sections of
+the flamegraph, try downloading the files and re-opening the local file in a
+browser. You can also use the "Search" functionality to highlight.
+- The flamegraphs were constructed using [flamegraph](https://github.com/flamegraph-rs/flamegraph),
+with the commands detailed [here](https://github.com/j-berman/fcmp-plus-plus/blob/760b7784c3b77a7f43329317448fe5bcbc00dfd3/crypto/fcmps/README.md#flamegraphs).
 
 TODO: running the benchmark should produce the final weighted score.
