@@ -117,5 +117,3 @@ the flamegraph, try downloading the files and re-opening the local file in a
 browser. You can also use the "Search" functionality to highlight.
 - The flamegraphs were constructed using [flamegraph](https://github.com/flamegraph-rs/flamegraph),
 with the commands detailed [here](https://github.com/j-berman/fcmp-plus-plus/blob/760b7784c3b77a7f43329317448fe5bcbc00dfd3/crypto/fcmps/README.md#flamegraphs).
-
-TODO: running the benchmark should produce the final weighted score.
