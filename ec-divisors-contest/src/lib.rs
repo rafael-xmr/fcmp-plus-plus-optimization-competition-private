@@ -1,14 +1,14 @@
 #![no_std]
 #![allow(static_mut_refs)]
 
-use ec_divisors::{DivisorCurve as DivisorCurveRef, ScalarDecomposition as ScalarDecompositionRef};
-use ec_divisors_contest_src::{DivisorCurve, ScalarDecomposition};
+use ec_divisors::{DivisorCurve as DivisorCurveRef, ScalarDecomposition as ScalarDecompositionRef, Poly as PolyRef};
+use ec_divisors_contest_src::{DivisorCurve, ScalarDecomposition, Poly};
 
 use ciphersuite::{
     group::{ff::Field, Group},
     Ciphersuite, Ed25519,
 };
-use dalek_ff_group::{EdwardsPoint, Scalar};
+use dalek_ff_group::{EdwardsPoint, FieldElement, Scalar};
 
 use zeroize::Zeroizing;
 
@@ -17,18 +17,26 @@ use rand_core::SeedableRng;
 
 use std_shims::sync::OnceLock;
 
-pub fn init_ref(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecompositionRef<Scalar> {
+pub fn check_init_ref(point: &EdwardsPoint, scalar: &Scalar) {
     let scalar = ScalarDecompositionRef::new(*scalar).unwrap();
     let point = Zeroizing::new(*point * scalar.scalar());
     let (_, _) = <EdwardsPoint as DivisorCurveRef>::to_xy(*point).unwrap();
-    scalar
 }
 
-pub fn init_contest(point: &EdwardsPoint, scalar: &Scalar) -> ScalarDecomposition<Scalar> {
-    let scalar = ScalarDecomposition::new(*scalar).expect("failed scalar decompsition");
+pub fn check_init_contest(point: &EdwardsPoint, scalar: &Scalar) {
+    let scalar = ScalarDecomposition::new(*scalar).expect("failed scalar decomposition");
     let point = Zeroizing::new(*point * scalar.scalar());
     let (_, _) = <EdwardsPoint as DivisorCurve>::to_xy(*point).expect("zero scalar was decomposed");
-    scalar
+}
+
+pub fn run_bench_ref(point: &EdwardsPoint, scalar: &Scalar) -> PolyRef<FieldElement> {
+    let scalar = ScalarDecompositionRef::new(*scalar).unwrap();
+    scalar.scalar_mul_divisor(*point)
+}
+
+pub fn run_bench_contest(point: &EdwardsPoint, scalar: &Scalar) -> Poly<FieldElement> {
+    let scalar = ScalarDecomposition::new(*scalar).unwrap();
+    scalar.scalar_mul_divisor(*point)
 }
 
 // For error: no global memory allocator found but one is required; link to std or add `#[global_allocator]` to a static item that implements the GlobalAlloc trait
@@ -61,20 +69,20 @@ register_custom_getrandom!(custom_getrandom);
 
 struct EcDivisorsParamsRef {
     point: EdwardsPoint,
-    scalar: ScalarDecompositionRef<Scalar>,
+    scalar: Scalar,
 }
 
 struct EcDivisorsParams {
     point: EdwardsPoint,
-    scalar: ScalarDecomposition<Scalar>,
+    scalar: Scalar,
 }
 
 impl EcDivisorsParamsRef {
     pub fn new(rng_seed: [u8; 32]) -> Self {
         let point = EdwardsPoint::generator();
         let mut rng = ChaCha20Rng::from_seed(rng_seed);
-        let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut rng);
-        let scalar = init_ref(&point, &rand_scalar);
+        let scalar = <Ed25519 as Ciphersuite>::F::random(&mut rng);
+        check_init_ref(&point, &scalar);
         Self { point, scalar }
     }
 }
@@ -83,8 +91,8 @@ impl EcDivisorsParams {
     pub fn new(rng_seed: [u8; 32]) -> Self {
         let point = EdwardsPoint::generator();
         let mut rng = ChaCha20Rng::from_seed(rng_seed);
-        let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut rng);
-        let scalar = init_contest(&point, &rand_scalar);
+        let scalar = <Ed25519 as Ciphersuite>::F::random(&mut rng);
+        check_init_contest(&point, &scalar);
         Self { point, scalar }
     }
 }
@@ -129,9 +137,7 @@ pub extern "C" fn case_scalar_mul_divisor_contest2() {
 pub extern "C" fn test_scalar_mul_divisor_ref() {
     core::hint::black_box(unsafe {
         let params = EC_DIVISORS_PARAMS_REF.get().unwrap();
-        params
-            .scalar
-            .scalar_mul_divisor(params.point)
+        run_bench_ref(&params.point, &params.scalar);
     });
 }
 
@@ -139,8 +145,6 @@ pub extern "C" fn test_scalar_mul_divisor_ref() {
 pub extern "C" fn test_scalar_mul_divisor_contest() {
     core::hint::black_box(unsafe {
         let params = EC_DIVISORS_PARAMS.get().unwrap();
-        params
-            .scalar
-            .scalar_mul_divisor(params.point)
+        run_bench_contest(&params.point, &params.scalar);
     });
 }

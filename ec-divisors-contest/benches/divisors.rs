@@ -1,4 +1,4 @@
-use ec_divisors_contest::{init_ref, init_contest};
+use ec_divisors_contest::{check_init_contest, check_init_ref, run_bench_contest, run_bench_ref};
 
 use ciphersuite::{
     group::{ff::Field, Group},
@@ -17,18 +17,17 @@ fn bench_scalar_mul_divisors(c: &mut Criterion) {
     let point = EdwardsPoint::generator();
     let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut OsRng);
 
-    // Get scalar decompositions
-    let scalar_ref = init_ref(&point, &rand_scalar);
-    let scalar_contest = init_contest(&point, &rand_scalar);
+    check_init_ref(&point, &rand_scalar);
+    check_init_contest(&point, &rand_scalar);
 
     // Run the benchmark for the reference implementation
     group.bench_function("reference-impl", |b| {
-        b.iter(|| scalar_ref.scalar_mul_divisor(point))
+        b.iter(|| run_bench_ref(&point, &rand_scalar))
     });
 
     // Run the benchmark for the contest implementation
     group.bench_function("contest-impl", |b| {
-        b.iter(|| scalar_contest.scalar_mul_divisor(point))
+        b.iter(|| run_bench_contest(&point, &rand_scalar))
     });
 
     group.finish();

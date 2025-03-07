@@ -1,4 +1,4 @@
-use ec_divisors_contest::{init_ref, init_contest};
+use ec_divisors_contest::{check_init_contest, check_init_ref, run_bench_contest, run_bench_ref};
 
 use ciphersuite::{
     group::{ff::Field, Group},
@@ -17,15 +17,14 @@ fn divisors_contest_test() {
         println!("Testing with random scalar {} / {}", i + 1, N_ITERS);
 
         let point = EdwardsPoint::generator();
-        let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut OsRng);
+        let scalar = <Ed25519 as Ciphersuite>::F::random(&mut OsRng);
 
-        // Get scalar decompositions
-        let scalar_ref = init_ref(&point, &rand_scalar);
-        let scalar_contest = init_contest(&point, &rand_scalar);
+        check_init_ref(&point, &scalar);
+        check_init_contest(&point, &scalar);
 
         // Get divisors
-        let ref_res = scalar_ref.scalar_mul_divisor(point);
-        let res = scalar_contest.scalar_mul_divisor(point);
+        let ref_res = run_bench_ref(&point, &scalar);
+        let res = run_bench_contest(&point, &scalar);
 
         assert_eq!(ref_res.y_coefficients, res.y_coefficients);
         assert_eq!(ref_res.yx_coefficients, res.yx_coefficients);

@@ -73,11 +73,10 @@ Good luck!
 
 ## Why
 
-The specific function this contest is aiming to optimize is expected to be
+The specific code this contest is aiming to optimize is expected to be
 used in Monero's upcoming upgrade to [FCMP++](https://www.getmonero.org/2024/04/27/fcmps.html).
 Specifically, it's a major component of FCMP++ prove (used to construct a FCMP++
 transaction). Here is a flamegraph of [prove](https://raw.githubusercontent.com/j-berman/fcmp-plus-plus/760b7784c3b77a7f43329317448fe5bcbc00dfd3/crypto/fcmps/flamegraph_prove.svg).
 Notice how `scalar_mul_divisor` dominates the flamegraph by an extreme majority.
-Thus, the aim of this contest is to optimize `scalar_mul_divisor`.
 For reference, the flamegraphs were constructed using [flamegraph](https://github.com/flamegraph-rs/flamegraph),
 with the commands detailed [here](https://github.com/j-berman/fcmp-plus-plus/blob/760b7784c3b77a7f43329317448fe5bcbc00dfd3/crypto/fcmps/README.md#flamegraphs).
