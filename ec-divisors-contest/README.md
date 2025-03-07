@@ -80,3 +80,14 @@ transaction). Here is a flamegraph of [prove](https://raw.githubusercontent.com/
 Notice how `scalar_mul_divisor` dominates the flamegraph by an extreme majority.
 For reference, the flamegraphs were constructed using [flamegraph](https://github.com/flamegraph-rs/flamegraph),
 with the commands detailed [here](https://github.com/j-berman/fcmp-plus-plus/blob/760b7784c3b77a7f43329317448fe5bcbc00dfd3/crypto/fcmps/README.md#flamegraphs).
+
+## Scoring
+
+The benchmark calls 2 functions: `ScalarDecomposition::new` then
+`scalar_mul_divisor`. In the integration in Monero, we call
+`ScalarDecomposition::new` one fewer times than `scalar_mul_divisor`. Thus, if
+we receive two submissions where the overall benchmark improvement is roughly
+the same, where submission A has fast `ScalarDecomposition::new` but slow
+`scalar_mul_divisor` and submission B vice versa, then submission B is a
+stronger submission. Thus, you may be inclined to focus optimizing the benchmark
+by moving more logic into the pre-process `ScalarDecomposition::new` step.
