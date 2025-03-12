@@ -3,6 +3,7 @@
 Welcome, contestant!
 
 Please read ALL requirements *carefully* in [`../README.md`](../README.md) before reading this.
+Please read this entire README carefully as well.
 If you have any questions, do not hesitate to ask in IRC/Matrix #monero-dev,
 or create an issue.
 
