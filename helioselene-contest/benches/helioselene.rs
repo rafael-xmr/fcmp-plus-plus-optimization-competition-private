@@ -28,8 +28,8 @@ enum OpType {
 fn op_weight(op: OpType) -> f64 {
     match op {
         OpType::SelenePointAdd => 0.30,
-        OpType::HeliosPointAdd => 0.20,
-        OpType::HelioseleneMul => 0.10,
+        OpType::HeliosPointAdd => 0.15,
+        OpType::HelioseleneMul => 0.15,
         OpType::HelioseleneInvert => 0.10,
         OpType::SelenePointDecompression => 0.075,
         OpType::HeliosPointDecompression => 0.075,

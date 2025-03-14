@@ -81,8 +81,8 @@ The following operations are weighed as followed:
 | Operation  | % Weight |
 | ------------- | ------------- |
 | Selene Point Add  | 30%  |
-| Helios Point Add  | 20%  |
-| helioselene Mul  | 10%  |
+| Helios Point Add  | 15%  |
+| helioselene Mul  | 15%  |
 | helioselene Invert  | 10%  |
 | Selene Point Decompression  | 7.5%  |
 | Helios Point Decompression  | 7.5%  |
