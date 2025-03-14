@@ -96,16 +96,16 @@ your submission would qualify as a valid submission.
     - 67% * 30% = 20.1% overall improvement.
     - 20.1% > 20% minimum required improvement.
 
-- If you improve Selene Point Add by 50%, Helios Point Add by 30%, and improve
+- If you improve Selene Point Add by 50%, Helios Point Add by 50%, and improve
 nothing else, your submission would qualify as a valid submission.
     - 50% * 30% = 15% overall improvement from improving Selene Point Add.
-    - 30% * 20% = 6% overall improvement from improving Helios Point Add.
-    - 21% > 20% minimum required improvement.
+    - 30% * 15% = 7.5% overall improvement from improving Helios Point Add.
+    - 22.5% > 20% minimum required improvement.
 
 - Some operations are used in others. For example, Selene Point Add is composed
 of helioselene Mul, helioselene Add, and helioselene Sub. Thus, if you improve
 helioselene Mul, then you would also improve Selene Point Add, and thus your
-overall improvement score would benefit.
+overall improvement score would benefit double jeopardy style.
 
 The weights were determined based on their respective weights in functions
 intended for use in Monero. You can see flamegraphs for the relevant functions
