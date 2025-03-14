@@ -99,7 +99,7 @@ your submission would qualify as a valid submission.
 - If you improve Selene Point Add by 50%, Helios Point Add by 50%, and improve
 nothing else, your submission would qualify as a valid submission.
     - 50% * 30% = 15% overall improvement from improving Selene Point Add.
-    - 30% * 15% = 7.5% overall improvement from improving Helios Point Add.
+    - 50% * 15% = 7.5% overall improvement from improving Helios Point Add.
     - 22.5% > 20% minimum required improvement.
 
 - Some operations are used in others. For example, Selene Point Add is composed
