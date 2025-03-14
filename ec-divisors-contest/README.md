@@ -66,8 +66,8 @@ rustup target add wasm32v1-none
 To run the tests:
 
 ```
-cargo +1.69.0 test --release
-cargo +1.84.1 test --release
+cargo +1.69.0 test --release -- --nocapture
+cargo +1.84.1 test --release -- --nocapture
 ```
 
 To run the benchmark, only use 1.84.1:
