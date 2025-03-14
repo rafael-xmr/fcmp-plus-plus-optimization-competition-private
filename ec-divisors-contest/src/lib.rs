@@ -29,14 +29,14 @@ pub fn check_init_contest(point: &EdwardsPoint, scalar: &Scalar) {
     let (_, _) = <EdwardsPoint as DivisorCurve>::to_xy(*point).expect("zero scalar was decomposed");
 }
 
-pub fn run_bench_ref(point: &EdwardsPoint, scalar: &Scalar) -> PolyRef<FieldElement> {
+pub fn run_bench_ref(point: &EdwardsPoint, scalar: &Scalar) -> (PolyRef<FieldElement>, ScalarDecompositionRef<Scalar>) {
     let scalar = ScalarDecompositionRef::new(*scalar).unwrap();
-    scalar.scalar_mul_divisor(*point)
+    (scalar.scalar_mul_divisor(*point), scalar)
 }
 
-pub fn run_bench_contest(point: &EdwardsPoint, scalar: &Scalar) -> Poly<FieldElement> {
+pub fn run_bench_contest(point: &EdwardsPoint, scalar: &Scalar) -> (Poly<FieldElement>, ScalarDecomposition<Scalar>) {
     let scalar = ScalarDecomposition::new(*scalar).unwrap();
-    scalar.scalar_mul_divisor(*point)
+    (scalar.scalar_mul_divisor(*point), scalar)
 }
 
 // For error: no global memory allocator found but one is required; link to std or add `#[global_allocator]` to a static item that implements the GlobalAlloc trait

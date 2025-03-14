@@ -13,6 +13,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 // ../ec-divisors-contest-src
 fn bench_scalar_mul_divisors(c: &mut Criterion) {
     let mut group = c.benchmark_group("ec-divisors");
+    group.measurement_time(core::time::Duration::from_secs(60));
 
     let point = EdwardsPoint::generator();
     let rand_scalar = <Ed25519 as Ciphersuite>::F::random(&mut OsRng);
@@ -22,12 +23,12 @@ fn bench_scalar_mul_divisors(c: &mut Criterion) {
 
     // Run the benchmark for the reference implementation
     group.bench_function("reference-impl", |b| {
-        b.iter(|| run_bench_ref(&point, &rand_scalar))
+        b.iter_with_large_drop(|| run_bench_ref(&point, &rand_scalar))
     });
 
     // Run the benchmark for the contest implementation
     group.bench_function("contest-impl", |b| {
-        b.iter(|| run_bench_contest(&point, &rand_scalar))
+        b.iter_with_large_drop(|| run_bench_contest(&point, &rand_scalar))
     });
 
     group.finish();

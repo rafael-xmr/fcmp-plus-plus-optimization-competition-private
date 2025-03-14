@@ -23,8 +23,8 @@ fn divisors_contest_test() {
         check_init_contest(&point, &scalar);
 
         // Get divisors
-        let ref_res = run_bench_ref(&point, &scalar);
-        let res = run_bench_contest(&point, &scalar);
+        let ref_res = run_bench_ref(&point, &scalar).0;
+        let res = run_bench_contest(&point, &scalar).0;
 
         assert_eq!(ref_res.y_coefficients, res.y_coefficients);
         assert_eq!(ref_res.yx_coefficients, res.yx_coefficients);
