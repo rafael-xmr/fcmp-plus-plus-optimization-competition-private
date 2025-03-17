@@ -75,12 +75,14 @@ Please create an issue requesting to use a dependency, or contact
 @jberman:monero.social on Matrix. We will approve dependencies on a case-by-case
 basis.
 
-8) Submissions must not rely on tables built at time of compilation.
+8) The total maximum source code size is 1 million bytes. 
 
-9) Submissions may build a cache and store it in a static at runtime.
+9) Submissions which rely on tables/caches built at time of compilation must contain code
+to deterministically reproduce those tables. This code must be able to be called at runtime.
 
-The time to build the cache will be counted as part of the time for the
-benchmark to execute however.
+This reproduction code is counted towards the total code size. If a table/cache cannot be built
+at compile time, then the time to build the table will be included in the total runtime, amortized
+over 10 thousand calls.
 
 10) Submissions must pass the provided test suite and run with the provided
     benchmark.
