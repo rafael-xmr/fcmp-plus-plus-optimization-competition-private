@@ -100,7 +100,7 @@ impl EcDivisorsParams {
 static mut EC_DIVISORS_PARAMS: OnceLock<EcDivisorsParams> = OnceLock::new();
 static mut EC_DIVISORS_PARAMS_REF: OnceLock<EcDivisorsParamsRef> = OnceLock::new();
 
-// Tests using different seed with for https://github.com/kayabaNerve/wasm-cycles
+// Tests using different seed with for https://github.com/j-berman/wasm-cycles
 #[no_mangle]
 pub extern "C" fn case_scalar_mul_divisor_ref1() {
     unsafe {

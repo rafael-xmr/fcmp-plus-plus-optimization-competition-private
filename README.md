@@ -37,7 +37,7 @@ operated over. We do assume shifts and multiplications execute in constant
 time.
 
 Additionally, code will be run through
-[`wasm-cycles`](https://github.com/kayabaNerve/wasm-cycles/) to verify a
+[`wasm-cycles`](https://github.com/j-berman/wasm-cycles/) to verify a
 constant cycle count when compiled for `wasm32v1-none`. This is
 incomprehensive to certain issues such as cache side-channel attacks, yet
 represents an automated way to eliminate some types of non-constant-time code.

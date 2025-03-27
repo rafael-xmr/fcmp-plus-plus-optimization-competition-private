@@ -77,7 +77,7 @@ pub fn custom_getrandom(_buf: &mut [u8]) -> Result<(), Error> {
 #[cfg(target_arch = "wasm32")]
 register_custom_getrandom!(custom_getrandom);
 
-// Tests for https://github.com/kayabaNerve/wasm-cycles
+// Tests for https://github.com/j-berman/wasm-cycles
 fn init_ref_helios_scalars(rng_seed: [u8; 32]) -> (HelioseleneFieldRef, HelioseleneFieldRef) {
     let mut rng = ChaCha20Rng::from_seed(rng_seed);
     let a = HelioseleneFieldRef::random(&mut rng);

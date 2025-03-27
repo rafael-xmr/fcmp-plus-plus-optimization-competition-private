@@ -63,7 +63,7 @@ you may need to remove `target/` and Cargo.lock, then run again.
 To run the wasm cycle counter:
 
 ```
-git clone https://github.com/kayabaNerve/wasm-cycles
+git clone https://github.com/j-berman/wasm-cycles
 cd wasm-cycles
 cargo +1.84.1 run --release -- ../fcmp-plus-plus-optimization-competition/helioselene-contest +1.84.1
 ```
