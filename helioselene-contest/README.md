@@ -41,7 +41,7 @@ rustup install 1.84.1
 Second, make sure you have the `wasm32v1-none` target installed.
 
 ```
-rustup target add wasm32v1-none
+rustup +1.84.1 target add wasm32v1-none
 ```
 
 To run the tests:
