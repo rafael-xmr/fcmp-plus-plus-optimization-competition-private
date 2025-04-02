@@ -129,7 +129,7 @@ in the competition.
 
 We may add judges in the future at our discretion.
 
-If you have any questions, do not hesitate to ask in IRC/Matrix #monero-dev,
+If you have any questions, do not hesitate to ask in IRC/[Matrix](https://matrix.to/#/%23monero-dev:monero.social?via=matrix.org&via=monero.social) #monero-dev,
 or create an issue.
 
 ### Prizes
@@ -156,4 +156,4 @@ repository.
 We will acknowledge receipt of your submission via a "thumbs up" reaction to
 your PR.
 
-You may also submit a patch to @jberman:monero.social on Matrix.
+You may also submit a patch to [@jberman:monero.social](https://matrix.to/#/@jberman:monero.social) on Matrix.
