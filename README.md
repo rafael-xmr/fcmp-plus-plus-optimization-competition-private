@@ -138,6 +138,12 @@ The best submission for an optimized `helioselene` will be awarded 100 XMR.
 
 The best solution for an optimized `ec-divisors` will be awarded 250 XMR.
 
+### How to get started
+
+For `helioselene`, visit [`helioselene-contest`](./helioselene-contest/).
+
+For `ec-divisors`, visit [`ec-divisors-contest`](./ec-divisors-contest/).
+
 ### How to submit
 
 1) Create a [private fork](https://gist.github.com/0xjac/85097472043b697ab57ba1b1c7530274) of this repository.
