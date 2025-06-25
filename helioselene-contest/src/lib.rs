@@ -8,7 +8,7 @@ use helioselene::{
 };
 use helioselene_contest_src::{
     group::{ff::PrimeField, Group, GroupEncoding},
-    Field25519, HeliosPoint, HelioseleneField, SelenePoint,
+    Field25519, HeliosPoint, SeleneField, SelenePoint,
 };
 
 use rand_core::OsRng;
@@ -18,12 +18,12 @@ use rand_core::SeedableRng;
 
 use paste::paste;
 
-use std_shims::sync::OnceLock;
 use core::assert_eq;
+use std_shims::sync::OnceLock;
 
-pub fn test_gen_random_helios_scalar() -> (HelioseleneField, HelioseleneFieldRef) {
+pub fn test_gen_random_helios_scalar() -> (SeleneField, HelioseleneFieldRef) {
     let a_ref = HelioseleneFieldRef::random(&mut OsRng);
-    let a = HelioseleneField::from_repr(a_ref.to_repr()).expect("Failed to read scalar");
+    let a = SeleneField::from_repr(a_ref.to_repr()).expect("Failed to read scalar");
     assert_eq!(a.to_repr(), a_ref.to_repr());
     (a, a_ref)
 }
@@ -56,7 +56,14 @@ pub fn test_gen_random_selene_point() -> (SelenePoint, SelenePointRef) {
 static ALLOCATOR: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
 
 #[cfg(target_arch = "wasm32")]
-use core::{unimplemented, result::{Result, Result::{Ok, Err}}, panic::PanicInfo};
+use core::{
+    panic::PanicInfo,
+    result::{
+        Result,
+        Result::{Err, Ok},
+    },
+    unimplemented,
+};
 
 #[cfg(target_arch = "wasm32")]
 use getrandom::{register_custom_getrandom, Error};
@@ -85,10 +92,10 @@ fn init_ref_helios_scalars(rng_seed: [u8; 32]) -> (HelioseleneFieldRef, Heliosel
     (a, b)
 }
 
-fn init_contest_helios_scalars(rng_seed: [u8; 32]) -> (HelioseleneField, HelioseleneField) {
+fn init_contest_helios_scalars(rng_seed: [u8; 32]) -> (SeleneField, SeleneField) {
     let mut rng = ChaCha20Rng::from_seed(rng_seed);
-    let a = HelioseleneField::random(&mut rng);
-    let b = HelioseleneField::random(&mut rng);
+    let a = SeleneField::random(&mut rng);
+    let b = SeleneField::random(&mut rng);
     (a, b)
 }
 
@@ -160,7 +167,7 @@ macro_rules! curve_test_params {
 
             static mut $STRUCT_VAR_NAME: OnceLock<$StructName> = OnceLock::new();
         }
-    }
+    };
 }
 
 curve_test_params!(
@@ -185,7 +192,7 @@ curve_test_params!(
     HELIOS_TEST_PARAMS,
     helios,
     HeliosPoint,
-    HelioseleneField,
+    SeleneField,
     contest
 );
 curve_test_params!(
@@ -283,13 +290,23 @@ pub extern "C" fn test_helioselene_sqrt_contest() {
 
 #[no_mangle]
 pub extern "C" fn test_helioselene_pow_ref() {
-    let (a, b) = unsafe { (HELIOS_TEST_PARAMS_REF.get().unwrap().s1, HELIOS_TEST_PARAMS_REF.get().unwrap().s2) };
+    let (a, b) = unsafe {
+        (
+            HELIOS_TEST_PARAMS_REF.get().unwrap().s1,
+            HELIOS_TEST_PARAMS_REF.get().unwrap().s2,
+        )
+    };
     let _ = core::hint::black_box(a.pow(b));
 }
 
 #[no_mangle]
 pub extern "C" fn test_helioselene_pow_contest() {
-    let (a, b) = unsafe { (HELIOS_TEST_PARAMS.get().unwrap().s1, HELIOS_TEST_PARAMS.get().unwrap().s2) };
+    let (a, b) = unsafe {
+        (
+            HELIOS_TEST_PARAMS.get().unwrap().s1,
+            HELIOS_TEST_PARAMS.get().unwrap().s2,
+        )
+    };
     let _ = core::hint::black_box(a.pow(b));
 }
 
