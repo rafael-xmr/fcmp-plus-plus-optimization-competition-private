@@ -8,7 +8,7 @@ use helioselene::{
 };
 use helioselene_contest_src::{
     group::{ff::PrimeField, Group, GroupEncoding},
-    Field25519, HeliosPoint, SeleneField, SelenePoint,
+    Field25519, HeliosPoint, HelioseleneField, SelenePoint,
 };
 
 use rand_core::OsRng;
@@ -21,9 +21,9 @@ use paste::paste;
 use core::assert_eq;
 use std_shims::sync::OnceLock;
 
-pub fn test_gen_random_helios_scalar() -> (SeleneField, HelioseleneFieldRef) {
+pub fn test_gen_random_helios_scalar() -> (HelioseleneField, HelioseleneFieldRef) {
     let a_ref = HelioseleneFieldRef::random(&mut OsRng);
-    let a = SeleneField::from_repr(a_ref.to_repr()).expect("Failed to read scalar");
+    let a = HelioseleneField::from_repr(a_ref.to_repr()).expect("Failed to read scalar");
     assert_eq!(a.to_repr(), a_ref.to_repr());
     (a, a_ref)
 }
@@ -92,10 +92,10 @@ fn init_ref_helios_scalars(rng_seed: [u8; 32]) -> (HelioseleneFieldRef, Heliosel
     (a, b)
 }
 
-fn init_contest_helios_scalars(rng_seed: [u8; 32]) -> (SeleneField, SeleneField) {
+fn init_contest_helios_scalars(rng_seed: [u8; 32]) -> (HelioseleneField, HelioseleneField) {
     let mut rng = ChaCha20Rng::from_seed(rng_seed);
-    let a = SeleneField::random(&mut rng);
-    let b = SeleneField::random(&mut rng);
+    let a = HelioseleneField::random(&mut rng);
+    let b = HelioseleneField::random(&mut rng);
     (a, b)
 }
 
@@ -192,7 +192,7 @@ curve_test_params!(
     HELIOS_TEST_PARAMS,
     helios,
     HeliosPoint,
-    SeleneField,
+    HelioseleneField,
     contest
 );
 curve_test_params!(

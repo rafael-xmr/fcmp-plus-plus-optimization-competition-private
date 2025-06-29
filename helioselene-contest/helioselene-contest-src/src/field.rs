@@ -457,64 +457,64 @@ fn f255_double(x: U256, c_lo: u64, c_hi: u64, modulus_limbs: &'static [u64; 4]) 
     u256_from_u64_array(r)
 }
 
-mod helios {
+mod f25519 {
     use super::*;
     use subtle::ConditionallyNegatable;
 
-    pub const HELIOS_C_LO: u64 = 19u64;
-    pub const HELIOS_C_HI: u64 = 0u64;
+    pub const F25519_C_LO: u64 = 19u64;
+    pub const F25519_C_HI: u64 = 0u64;
 
-    const HELIOS_MODULUS_STR: &str =
+    const F25519_MODULUS_STR: &str =
         "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed";
 
     // Square root of -1.
     // Formula from RFC-8032 (modp_sqrt_m1/sqrt8k5 z)
     // 2 ** ((MODULUS - 1) // 4) % MODULUS
-    pub const HELIOS_SQRT_M1_MAGIC: HeliosField = HeliosField(U256::from_be_hex(
+    pub const F25519_SQRT_M1_MAGIC: Field25519 = Field25519(U256::from_be_hex(
         "2b8324804fc1df0b2b4d00993dfbd7a72f431806ad2fe478c4ee1b274a0ea0b0",
     ));
 
     #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
     #[repr(C)]
-    pub struct HeliosField(pub(crate) U256);
+    pub struct Field25519(pub(crate) U256);
 
     field!(
-        HeliosField,
-        HELIOS_MODULUS_STR,
-        HELIOS_C_LO,
-        HELIOS_C_HI,
+        Field25519,
+        F25519_MODULUS_STR,
+        F25519_C_LO,
+        F25519_C_HI,
         2,
         2,
         "2b8324804fc1df0b2b4d00993dfbd7a72f431806ad2fe478c4ee1b274a0ea0b0",
         "0000000000000000000000000000000000000000000000000000000000000010",
     );
 
-    impl DefaultIsZeroes for HeliosField {}
+    impl DefaultIsZeroes for Field25519 {}
 
-    impl HeliosField {
+    impl Field25519 {
         // (p + 3) / 8
-        pub const MOD_3_8: HeliosField = HeliosField(
+        pub const MOD_3_8: Field25519 = Field25519(
             MODULUS
                 .saturating_add(&U256::from_u8(3))
                 .wrapping_div(&U256::from_u8(8)),
         );
 
         // (p + 3) / 8 - 1 = (p - 5) / 8
-        const MOD_5_8: HeliosField = HeliosField(
+        const MOD_5_8: Field25519 = Field25519(
             MODULUS
                 .saturating_sub(&U256::from_u8(5))
                 .wrapping_div(&U256::from_u8(8)),
         );
 
-        pub fn sqrt(&self) -> CtOption<HeliosField> {
+        pub fn sqrt(&self) -> CtOption<Field25519> {
             let tv1 = self.pow(Self::MOD_3_8);
-            let tv2 = tv1 * HELIOS_SQRT_M1_MAGIC;
+            let tv2 = tv1 * F25519_SQRT_M1_MAGIC;
             let candidate = Self::conditional_select(&tv2, &tv1, tv1.square().ct_eq(self));
             CtOption::new(candidate, candidate.square().ct_eq(self))
         }
 
         pub fn sqrt_ratio(u: &Self, v: &Self) -> (Choice, Self) {
-            let i = HELIOS_SQRT_M1_MAGIC;
+            let i = F25519_SQRT_M1_MAGIC;
 
             let u = *u;
             let v = *v;
@@ -540,9 +540,9 @@ mod helios {
     #[test]
     fn test_sqrt_m1() {
         assert_eq!(
-            HELIOS_SQRT_M1_MAGIC,
-            HeliosField(U256::from_u8(2u8)).pow(HeliosField(
-                (HeliosField::ZERO - HeliosField::ONE)
+            F25519_SQRT_M1_MAGIC,
+            Field25519(U256::from_u8(2u8)).pow(Field25519(
+                (Field25519::ZERO - Field25519::ONE)
                     .0
                     .wrapping_div(&U256::from_u8(4u8)),
             ))
@@ -550,44 +550,44 @@ mod helios {
     }
 
     #[test]
-    fn test_helios_field() {
-        ff_group_tests::prime_field::test_prime_field_bits::<_, HeliosField>(&mut rand_core::OsRng);
+    fn test_field25519() {
+        ff_group_tests::prime_field::test_prime_field_bits::<_, Field25519>(&mut rand_core::OsRng);
     }
 }
-pub use helios::HeliosField;
+pub use f25519::Field25519;
 
-mod selene {
+mod helioselenefield {
     use super::*;
     use ff::helpers::sqrt_ratio_generic;
 
-    const SELENE_MODULUS_STR: &str =
+    const HELIOSELENE_MODULUS_STR: &str =
         "7fffffffffffffffffffffffffffffffbf7f782cb7656b586eb6d2727927c79f";
 
     /// For q = 7fffffffffffffffffffffffffffffffbf7f782cb7656b586eb6d2727927c79f
     /// c = 2^256 - 2*q
-    pub const SELENE_C_LO: u64 = 0x91492d8d86d83861;
-    pub const SELENE_C_HI: u64 = 0x408087d3489a94a7;
+    pub const HELIOSELENE_C_LO: u64 = 0x91492d8d86d83861;
+    pub const HELIOSELENE_C_HI: u64 = 0x408087d3489a94a7;
 
     /// The field novel to Helios/Selene - using Crandall reduction
     #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
     #[repr(C)]
-    pub struct SeleneField(pub(crate) U256);
+    pub struct HelioseleneField(pub(crate) U256);
 
-    impl DefaultIsZeroes for SeleneField {}
+    impl DefaultIsZeroes for HelioseleneField {}
 
     field!(
-        SeleneField,
-        SELENE_MODULUS_STR,
-        SELENE_C_LO,
-        SELENE_C_HI,
+        HelioseleneField,
+        HELIOSELENE_MODULUS_STR,
+        HELIOSELENE_C_LO,
+        HELIOSELENE_C_HI,
         5,
         1,
         "7fffffffffffffffffffffffffffffffbf7f782cb7656b586eb6d2727927c79e",
         "0000000000000000000000000000000000000000000000000000000000000019",
     );
 
-    impl SeleneField {
-        pub const MOD_1_4: SeleneField = SeleneField(
+    impl HelioseleneField {
+        pub const MOD_1_4: HelioseleneField = HelioseleneField(
             MODULUS
                 .saturating_add(&U256::ONE)
                 .wrapping_div(&U256::from_u8(4)),
@@ -605,7 +605,9 @@ mod selene {
 
     #[test]
     fn test_selene_field() {
-        ff_group_tests::prime_field::test_prime_field_bits::<_, SeleneField>(&mut rand_core::OsRng);
+        ff_group_tests::prime_field::test_prime_field_bits::<_, HelioseleneField>(
+            &mut rand_core::OsRng,
+        );
     }
 }
-pub use selene::SeleneField;
+pub use helioselenefield::HelioseleneField;

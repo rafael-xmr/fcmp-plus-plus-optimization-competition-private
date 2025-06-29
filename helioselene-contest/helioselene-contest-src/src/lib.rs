@@ -8,7 +8,7 @@ pub use group;
 mod backend;
 
 mod field;
-pub use field::{HeliosField as Field25519, SeleneField};
+pub use field::{Field25519, HelioseleneField};
 
 mod point;
 pub use point::{HeliosPoint, SelenePoint};

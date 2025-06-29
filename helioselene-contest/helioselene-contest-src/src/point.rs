@@ -18,7 +18,7 @@ use group::{
 
 use crate::{
     backend::u8_from_bool,
-    field::{HeliosField, SeleneField},
+    field::{Field25519, HelioseleneField},
 };
 
 macro_rules! curve {
@@ -427,8 +427,8 @@ macro_rules! curve {
 mod helios {
     use super::*;
     curve!(
-        SeleneField,
-        HeliosField,
+        HelioseleneField,
+        Field25519,
         HeliosPoint,
         "22e8c739b0ea70b8be94a76b3ebb7b3b043f6f384113bf3522b49ee1edd73ad4",
         "0000000000000000000000000000000000000000000000000000000000000003",
@@ -450,7 +450,7 @@ mod helios {
 
     #[test]
     fn zero_x_is_invalid() {
-        assert!(Option::<HeliosField>::from(recover_y(HeliosField::ZERO)).is_none());
+        assert!(Option::<Field25519>::from(recover_y(Field25519::ZERO)).is_none());
     }
 }
 pub use helios::HeliosPoint;
@@ -458,8 +458,8 @@ pub use helios::HeliosPoint;
 mod selene {
     use super::*;
     curve!(
-        HeliosField,
-        SeleneField,
+        Field25519,
+        HelioseleneField,
         SelenePoint,
         "70127713695876c17f51bba595ffe279f3944bdf06ae900e68de0983cb5a4558",
         "0000000000000000000000000000000000000000000000000000000000000001",
@@ -481,7 +481,7 @@ mod selene {
 
     #[test]
     fn zero_x_is_invalid() {
-        assert!(Option::<SeleneField>::from(recover_y(SeleneField::ZERO)).is_none());
+        assert!(Option::<HelioseleneField>::from(recover_y(HelioseleneField::ZERO)).is_none());
     }
 }
 pub use selene::SelenePoint;

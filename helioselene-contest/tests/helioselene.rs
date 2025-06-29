@@ -11,14 +11,14 @@ use helioselene::{
 };
 use helioselene_contest_src::{
     group::{ff::PrimeField, Group, GroupEncoding},
-    Field25519, HeliosPoint, SeleneField, SelenePoint,
+    Field25519, HeliosPoint, HelioseleneField, SelenePoint,
 };
 
 use rand_core::OsRng;
 
 fn test_field_ops(
-    a: SeleneField,
-    b: SeleneField,
+    a: HelioseleneField,
+    b: HelioseleneField,
     a_ref: HelioseleneFieldRef,
     b_ref: HelioseleneFieldRef,
 ) {
@@ -83,7 +83,7 @@ fn test_helios_point_ops(
     B: HeliosPoint,
     A_ref: HeliosPointRef,
     B_ref: HeliosPointRef,
-    s: SeleneField,
+    s: HelioseleneField,
     s_ref: HelioseleneFieldRef,
 ) {
     // Compress point
@@ -182,7 +182,7 @@ static N_ITERS: usize = 1000;
 
 #[test]
 pub fn test_helioselene_field() {
-    ff_group_tests::prime_field::test_prime_field_bits::<_, SeleneField>(&mut OsRng);
+    ff_group_tests::prime_field::test_prime_field_bits::<_, HelioseleneField>(&mut OsRng);
 
     // Test that the implementation in ../helioselene-contest-src produces the
     // same results as the reference implementation
