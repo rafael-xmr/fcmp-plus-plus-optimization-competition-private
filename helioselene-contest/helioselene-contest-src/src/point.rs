@@ -91,9 +91,9 @@ macro_rules! curve {
             fn add(self, other: Self) -> Self {
                 let X1 = self.x;
                 let Y1 = self.y;
-                let Z1 = self.z;
                 let X2 = other.x;
                 let Y2 = other.y;
+                let Z1 = self.z;
                 let Z2 = other.z;
 
                 let t0 = X1 * X2;
@@ -343,7 +343,6 @@ macro_rules! curve {
         impl GroupEncoding for $Point {
             type Repr = <$Field as PrimeField>::Repr;
 
-            #[inline(always)]
             fn from_bytes(bytes: &Self::Repr) -> CtOption<Self> {
                 // Extract and clear the sign bit
                 let sign = Choice::from(bytes[31] >> 7);

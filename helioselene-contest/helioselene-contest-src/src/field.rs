@@ -1,8 +1,42 @@
 use zeroize::DefaultIsZeroes;
 
-use crypto_bigint::{Encoding, Limb, U256};
+use crypto_bigint::{Encoding, Limb, Zero, U256};
 
-const TABLE_SIZE: usize = 16;
+#[cfg(target_pointer_width = "64")]
+fn u256_from_u64_array(arr: [u64; 4]) -> U256 {
+    U256::from_words(arr)
+}
+
+#[cfg(target_pointer_width = "32")]
+fn u256_from_u64_array(arr: [u64; 4]) -> U256 {
+    let mut words = [0u32; 8];
+    for i in 0..4 {
+        words[i * 2] = arr[i] as u32;
+        words[i * 2 + 1] = (arr[i] >> 32) as u32;
+    }
+    U256::from_words(words)
+}
+
+#[cfg(target_pointer_width = "64")]
+fn limbs_to_u64_array<const N: usize>(limbs: &[Limb; N]) -> [u64; 4] {
+    [limbs[0].0, limbs[1].0, limbs[2].0, limbs[3].0]
+}
+
+#[cfg(target_pointer_width = "32")]
+fn limbs_to_u64_array<const N: usize>(limbs: &[Limb; N]) -> [u64; 4] {
+    [
+        limbs[0].0 as u64 | ((limbs[1].0 as u64) << 32),
+        limbs[2].0 as u64 | ((limbs[3].0 as u64) << 32),
+        limbs[4].0 as u64 | ((limbs[5].0 as u64) << 32),
+        limbs[6].0 as u64 | ((limbs[7].0 as u64) << 32),
+    ]
+}
+
+#[inline(always)]
+const fn muladd(x: u64, y: u64, z: u64) -> (u64, u64) {
+    let res = (x as u128).wrapping_mul(y as u128).wrapping_add(z as u128);
+    ((res >> 64) as u64, res as u64)
+}
 
 #[inline(always)]
 const fn muladdcarry(x: u64, y: u64, z: u64, w: u64) -> (u64, u64) {
@@ -14,88 +48,55 @@ const fn muladdcarry(x: u64, y: u64, z: u64, w: u64) -> (u64, u64) {
 }
 
 #[inline(always)]
-const fn mac(word: u64, b: u64, c: u64, carry: u64) -> (u64, u64) {
-    let a = word as u128;
-    let b = b as u128;
-    let c = c as u128;
-    let carry = carry as u128;
-    let ret = a + (b * c) + carry;
-    (ret as u64, (ret >> 64) as u64)
-}
-
-#[inline(always)]
-const fn adc(x: [u64; 2], y: [u64; 2]) -> ([u64; 2], bool) {
-    let (lo, carry1) = x[0].overflowing_add(y[0]);
-    let (hi_temp, carry2) = x[1].overflowing_add(y[1]);
-    let (hi, carry3) = hi_temp.overflowing_add(carry1 as u64);
-    ([lo, hi], carry2 || carry3)
-}
-
-#[inline(always)]
 fn mul_wide(x: [u64; 2], y: [u64; 2]) -> ([u64; 2], [u64; 2]) {
-    // i = 0
-    let (r0, c0) = mac(0u64, x[0], y[0], 0);
-    let (r1, c1) = mac(0u64, x[0], y[1], c0);
+    let mut result = [0u64; 4];
 
-    let r2 = c1;
+    for i in 0..2 {
+        let mut carry = 0u64;
+        for j in 0..2 {
+            let k = i + j;
+            let (c, res) = muladdcarry(x[i], y[j], result[k], carry);
+            result[k] = res;
+            carry = c;
+        }
+        result[i + 2] = carry;
+    }
 
-    // i = 1
-    let (n1_2, c2) = mac(r1, x[1], y[0], 0);
-    let r1 = n1_2;
-    let (n2_2, c3) = mac(r2, x[1], y[1], c2);
-    let r2 = n2_2;
-    let r3 = c3;
-
-    ([r0, r1], [r2, r3])
+    ([result[0], result[1]], [result[2], result[3]])
 }
 
 #[inline(always)]
 fn square_wide(x: [u64; 2]) -> ([u64; 2], [u64; 2]) {
-    // First, handle cross products (off-diagonal elements)
-    // x[0] * x[1] appears twice in the expansion
-    let cross_prod = (x[0] as u128) * (x[1] as u128);
+    // x[0]²
+    let r0 = (x[0] as u128) * (x[0] as u128);
 
+    // x[0] * x[1]
+    let cross_prod = (x[0] as u128) * (x[1] as u128);
     // Double the cross product - need to handle potential overflow
     let doubled_low = cross_prod << 1;
-    let carry_from_double = (cross_prod >> 127) as u64; // Top bit that gets shifted out
-
-    // Place the doubled cross product at positions 1 and 2
-    let r1 = doubled_low as u64;
-    let r2 = (doubled_low >> 64) as u64;
-    let r3 = carry_from_double;
-
-    // Now add the diagonal elements (x[i] * x[i])
-    // x[0]²
-    let square0 = (x[0] as u128) * (x[0] as u128);
-    let r0 = square0 as u64;
 
     // Add high part of x[0]² to r1
-    let carry = square0 >> 64;
-    let sum = (r1 as u128) + carry;
-    let r1 = sum as u64;
-    let carry = sum >> 64;
+    let r1 = (doubled_low & 0xFFFFFFFFFFFFFFFF) + (r0 >> 64);
 
-    // Propagate carry to r2 - constant time version
-    let sum = (r2 as u128) + carry;
-    let r2 = sum as u64;
-    let carry = sum >> 64;
-
-    // Add carry to r3 - always do the addition
-    let sum = (r3 as u128) + carry;
-    let r3 = sum as u64;
+    // Propagate carry to r2
+    let r2 = (doubled_low >> 64) + (r1 >> 64);
 
     // x[1]²
     let square1 = (x[1] as u128) * (x[1] as u128);
 
-    // Add to r2 and r3
-    let sum = (r2 as u128) + (square1 as u64 as u128);
-    let r2 = sum as u64;
-    let carry = sum >> 64;
+    // Add square1's low part to r2
+    let r2_sum = r2 as u64 as u128 + (square1 & 0xFFFFFFFFFFFFFFFF);
 
-    let sum = (r3 as u128) + (square1 >> 64) + carry;
-    let r3 = sum as u64;
-
-    ([r0, r1], [r2, r3])
+    (
+        [r0 as u64, r1 as u64],
+        [
+            r2_sum as u64,
+            // Add carry to r3 - always do the addition
+            // Add to r2 and r3
+            ((((cross_prod >> 127) + (r2 >> 64)) as u64) as u128 + (square1 >> 64) + (r2_sum >> 64))
+                as u64,
+        ],
+    )
 }
 
 #[inline(always)]
@@ -107,106 +108,353 @@ fn bytes_to_words(bytes: [u8; 64]) -> [u64; 8] {
     words
 }
 
+// https://en.wikipedia.org/wiki/Barrett_reduction tailored for F255
 #[inline(always)]
-fn reduce_limbs(result: [u64; 8], c_lo: u64, c_hi: u64, modulus_limbs: &'static [Limb; 4]) -> U256 {
-    let r3 = result[3];
-    let r4 = result[4];
-    let r5 = result[5];
-    let r6 = result[6];
-    let r7 = result[7];
+fn reduce_limbs(result: [u64; 8], c_lo: u64, c_hi: u64, modulus_limbs: &'static [u64; 4]) -> U256 {
+    // Extract high 257 bits (bits 255-511)
+    let mut high257 = [0u64; 4];
+    for i in 0..4 {
+        high257[i] = (result[i + 4] << 1) | (result[i + 3] >> 63);
+    }
 
-    let high257 = [
-        (r4 << 1) | ((r3 >> 63) & 1),
-        (r5 << 1) | (r4 >> 63),
-        (r6 << 1) | (r5 >> 63),
-        (r7 << 1) | (r6 >> 63),
-    ];
-
-    let bit_256 = r7 >> 63;
-    let mut acc = [result[0], result[1], result[2], r3 & 0x7FFFFFFFFFFFFFFF];
-    let mut overflow = [0u64; 4];
+    // First reduction: multiply high257 by c
+    let mut acc = [0u64; 4];
+    let mut carry = 0u64;
 
     // Multiply high257 by c_lo
-    let mut carry = 0u64;
     for i in 0..4 {
-        let (c, prod) = muladdcarry(high257[i], c_lo, acc[i], carry);
-        acc[i] = prod;
+        let input = if i < 3 {
+            result[i]
+        } else {
+            result[3] & 0x7FFFFFFFFFFFFFFF
+        };
+        let (c, a) = muladdcarry(high257[i], c_lo, input, carry);
+        acc[i] = a;
         carry = c;
     }
 
-    overflow[0] = carry;
-
     // Multiply high257 by c_hi (shifted by 1 position)
-    carry = 0;
+    let mut overflow = [carry, 0u64];
+    carry = 0u64;
+
     for i in 0..4 {
-        if i + 1 < 4 {
-            let (c, prod) = muladdcarry(high257[i], c_hi, acc[i + 1], carry);
-            acc[i + 1] = prod;
-            carry = c;
-        } else {
-            // i + 1 >= 4, so it goes to overflow
-            let (c, prod) = muladdcarry(high257[i], c_hi, overflow[i + 1 - 4], carry);
-            overflow[i + 1 - 4] = prod;
+        if i > 0 {
+            let (c, a) = muladdcarry(high257[i - 1], c_hi, acc[i], carry);
+            acc[i] = a;
             carry = c;
         }
     }
 
-    // Final carry goes to overflow[1]
-    overflow[1] = overflow[1].wrapping_add(carry);
-    overflow[0] = overflow[0].wrapping_add(c_lo & bit_256.wrapping_neg());
+    // Handle final multiplication
+    let (overflow1, prod3) = muladdcarry(high257[3], c_hi, overflow[0], carry);
+    overflow[0] = prod3.wrapping_add(c_lo & (result[7] >> 63).wrapping_neg());
+    overflow[1] = overflow1;
 
     // Second reduction for overflow
-    // overflow represents multiples of 2^256 ≡ 2c (mod p)
+    // Multiply overflow by c_doubled
     let c_doubled_lo = c_lo << 1;
+    carry = 0u64;
+
+    for i in 0..2 {
+        let (c, a) = muladdcarry(overflow[i], c_doubled_lo, acc[i], carry);
+        acc[i] = a;
+        carry = c;
+    }
+
+    let (acc2, c) = acc[2].overflowing_add(carry);
+    acc[2] = acc2;
+    let (acc3, _) = acc[3].overflowing_add(c as u64);
+    acc[3] = acc3;
+
+    // Multiply overflow by c_doubled_hi (shifted)
     let c_doubled_hi = (c_hi << 1) | (c_lo >> 63);
+    carry = 0u64;
 
-    carry = 0;
-    for i in 0..4 {
-        let (c, prod) = muladdcarry(overflow[i], c_doubled_lo, acc[i], carry);
-        acc[i] = prod;
-        carry = c;
+    for i in 0..2 {
+        if i < 1 {
+            let (c, a) = muladdcarry(overflow[0], c_doubled_hi, acc[1], carry);
+            acc[1] = a;
+            carry = c;
+        } else {
+            let (c, a) = muladdcarry(overflow[1], c_doubled_hi, acc[2], carry);
+            acc[2] = a;
+            carry = c;
+        }
     }
 
-    // Now multiply overflow by c_doubled_hi (shifted by 1 position)
-    carry = 0;
-    for i in 0..3 {
-        let (c, prod) = muladdcarry(overflow[i], c_doubled_hi, acc[i + 1], carry);
-        acc[i + 1] = prod;
-        carry = c;
-    }
+    let (acc3, c2) = acc[3].overflowing_add(carry);
+    acc[3] = acc3;
 
-    // For constant time, do one more reduction iteration
-    // Multiply by c_doubled_lo
-    let (c0, prod0) = muladdcarry(carry, c_doubled_lo, acc[0], 0);
-    acc[0] = prod0;
-
-    // Multiply by c_doubled_hi (shifted by 1)
-    let (c1, prod1) = muladdcarry(carry, c_doubled_hi, acc[1], c0);
-    acc[1] = prod1;
-
-    // Propagate remaining carries
+    // Final reduction iteration
+    let (c0, acc0) = muladd(c2 as u64, c_doubled_lo, acc[0]);
+    acc[0] = acc0;
+    let (c1, acc1) = muladdcarry(c2 as u64, c_doubled_hi, acc[1], c0);
+    acc[1] = acc1;
     acc[2] = acc[2].wrapping_add(c1);
 
     // Subtract modulus with borrow
-    let mut reduced = [0u64; 4];
+    let mut diff = [0u64; 4];
     let mut borrow = 0u64;
 
     for i in 0..4 {
-        let (diff, b1) = acc[i].overflowing_sub(modulus_limbs[i].0);
-        let (diff2, b2) = diff.overflowing_sub(borrow);
-        reduced[i] = diff2;
+        let (d, b1) = acc[i].overflowing_sub(modulus_limbs[i]);
+        let (d, b2) = d.overflowing_sub(borrow);
+        diff[i] = d;
         borrow = (b1 | b2) as u64;
     }
 
-    // Conditional select
-    let select_reduced = (borrow == 0) as u64;
-    let mask = select_reduced.wrapping_neg();
+    // Constant-time selection
+    let mask = ((borrow == 0) as u64).wrapping_neg();
+    let mut result_words = [0u64; 4];
 
     for i in 0..4 {
-        acc[i] = (acc[i] & !mask) | (reduced[i] & mask);
+        result_words[i] = (acc[i] & !mask) | (diff[i] & mask);
     }
 
-    U256::from_words(acc)
+    u256_from_u64_array(result_words)
+}
+
+#[inline(always)]
+fn f255_add(x: U256, y: U256, c_lo: u64, c_hi: u64, modulus_limbs: &'static [u64; 4]) -> U256 {
+    let x_limbs = limbs_to_u64_array(x.as_limbs());
+    let y_limbs = limbs_to_u64_array(y.as_limbs());
+
+    // Addition with carry propagation
+    let mut r = [0u64; 4];
+    let mut carry = 0u64;
+
+    for i in 0..4 {
+        let (sum, c1) = x_limbs[i].overflowing_add(y_limbs[i]);
+        let (sum, c2) = sum.overflowing_add(carry);
+        r[i] = sum;
+        carry = (c1 | c2) as u64;
+    }
+
+    // Compute both with and without carry correction
+    let mut a = [0u64; 4];
+
+    // Add 2*c if there was overflow
+    let (a0, ca0) = r[0].overflowing_add(c_lo << 1);
+    a[0] = a0;
+    let mut carry_a = ca0 as u64;
+
+    let (a1, ca1) = r[1].overflowing_add((c_hi << 1) | (c_lo >> 63));
+    let (a1, ca1b) = a1.overflowing_add(carry_a);
+    a[1] = a1;
+    carry_a = (ca1 | ca1b) as u64;
+
+    for i in 2..4 {
+        let (sum, c) = r[i].overflowing_add(carry_a);
+        a[i] = sum;
+        carry_a = c as u64;
+    }
+
+    // Constant time select based on carry
+    let carry_mask = carry.wrapping_neg();
+    for i in 0..4 {
+        r[i] = (r[i] & !carry_mask) | (a[i] & carry_mask);
+    }
+
+    // Full reduction - subtract modulus
+    let mut s = [0u64; 4];
+    let mut borrow = 0u64;
+
+    for i in 0..4 {
+        let (diff, b1) = r[i].overflowing_sub(modulus_limbs[i]);
+        let (diff, b2) = diff.overflowing_sub(borrow);
+        s[i] = diff;
+        borrow = (b1 | b2) as u64;
+    }
+
+    // Constant time select reduced if no borrow
+    let no_borrow_mask = ((borrow == 0) as u64).wrapping_neg();
+    let mut result = [0u64; 4];
+
+    for i in 0..4 {
+        result[i] = (r[i] & !no_borrow_mask) | (s[i] & no_borrow_mask);
+    }
+
+    u256_from_u64_array(result)
+}
+
+#[inline(always)]
+fn f255_sub(x: U256, y: U256, modulus_limbs: &'static [u64; 4]) -> U256 {
+    let x_limbs = limbs_to_u64_array(x.as_limbs());
+    let y_limbs = limbs_to_u64_array(y.as_limbs());
+
+    // Subtraction with borrow propagation
+    let mut r = [0u64; 4];
+    let mut borrow = 0u64;
+
+    for i in 0..4 {
+        let (diff, b1) = x_limbs[i].overflowing_sub(y_limbs[i]);
+        let (diff, b2) = diff.overflowing_sub(borrow);
+        r[i] = diff;
+        borrow = (b1 | b2) as u64;
+    }
+
+    // Add modulus if there was a borrow
+    let mut a = [0u64; 4];
+    let mut carry = 0u64;
+
+    for i in 0..4 {
+        let (sum, c1) = r[i].overflowing_add(modulus_limbs[i]);
+        let (sum, c2) = sum.overflowing_add(carry);
+        a[i] = sum;
+        carry = (c1 | c2) as u64;
+    }
+
+    // Select based on borrow
+    let borrow_mask = borrow.wrapping_neg();
+    let mut result = [0u64; 4];
+
+    for i in 0..4 {
+        result[i] = (r[i] & !borrow_mask) | (a[i] & borrow_mask);
+    }
+
+    u256_from_u64_array(result)
+}
+
+#[inline(always)]
+fn f255_mul(x: U256, y: U256, c_lo: u64, c_hi: u64, modulus_limbs: &'static [u64; 4]) -> U256 {
+    let x_limbs = limbs_to_u64_array(x.as_limbs());
+    let y_limbs = limbs_to_u64_array(y.as_limbs());
+
+    let mut t = [0u64; 8];
+
+    for i in 0..4 {
+        let mut carry = 0u64;
+        for j in 0..4 {
+            let (hi, lo) = muladd(x_limbs[i], y_limbs[j], t[i + j]);
+            let (sum, c) = lo.overflowing_add(carry);
+            t[i + j] = sum;
+            carry = hi.wrapping_add(c as u64);
+        }
+        t[i + 4] = carry;
+    }
+
+    reduce_limbs(t, c_lo, c_hi, modulus_limbs)
+}
+
+#[inline(always)]
+fn f255_neg(x: U256, modulus_limbs: &'static [u64; 4]) -> U256 {
+    let x_limbs = limbs_to_u64_array(x.as_limbs());
+
+    let mut b = 0u64;
+    let mut res = [0u64; 4];
+
+    for i in 0..4 {
+        let (r, b1) = modulus_limbs[i].overflowing_sub(x_limbs[i]);
+        let (r, b2) = r.overflowing_sub(b);
+        res[i] = r;
+        b = (b1 | b2) as u64;
+    }
+
+    let zero_mask = (x.is_zero().unwrap_u8() as u64).wrapping_neg();
+
+    for i in 0..4 {
+        res[i] &= !zero_mask;
+    }
+
+    u256_from_u64_array(res)
+}
+
+#[inline(always)]
+fn f255_square(x: U256, c_lo: u64, c_hi: u64, modulus_limbs: &'static [u64; 4]) -> U256 {
+    let x_limbs = limbs_to_u64_array(x.as_limbs());
+
+    // Square low part: z0 = x_lo²
+    let (z0_lo, z0_hi) = square_wide([x_limbs[0], x_limbs[1]]);
+
+    // Square high part: z2 = x_hi²
+    let (z2_lo, z2_hi) = square_wide([x_limbs[2], x_limbs[3]]);
+
+    // Compute x_lo * x_hi for middle term (will be doubled)
+    let (z1_lo, z1_hi) = mul_wide([x_limbs[0], x_limbs[1]], [x_limbs[2], x_limbs[3]]);
+
+    // Add 2*z1[0] to r2
+    let (r2, c1) = z0_hi[0].overflowing_add(z1_lo[0] << 1);
+
+    // Add 2*z1[1] to r3
+    let (r3_temp, c2) = z0_hi[1].overflowing_add(z1_lo[1] << 1);
+    let (r3, c3) = r3_temp.overflowing_add((z1_lo[0] >> 63) + (c1 as u64));
+
+    // Add 2*z1[2] to r4
+    let (r4_temp, c4) = z2_lo[0].overflowing_add(z1_hi[0] << 1);
+    let (r4, c5) = r4_temp.overflowing_add((z1_lo[1] >> 63) + (c2 as u64) + (c3 as u64));
+
+    // Add 2*z1[3] to r5
+    let (r5_temp, c6) = z2_lo[1].overflowing_add(z1_hi[1] << 1);
+    let (r5, c7) = r5_temp.overflowing_add((z1_hi[0] >> 63) + (c4 as u64) + (c5 as u64));
+
+    // Propagate remaining carry
+    let (r6, c) = z2_hi[0].overflowing_add((z1_hi[1] >> 63) + (c6 as u64) + (c7 as u64));
+
+    reduce_limbs(
+        [
+            z0_lo[0],
+            z0_lo[1],
+            r2,
+            r3,
+            r4,
+            r5,
+            r6,
+            z2_hi[1].wrapping_add((c as u64).wrapping_neg() & 1),
+        ],
+        c_lo,
+        c_hi,
+        modulus_limbs,
+    )
+}
+
+#[inline(always)]
+fn f255_double(x: U256, c_lo: u64, c_hi: u64, modulus_limbs: &'static [u64; 4]) -> U256 {
+    let x_limbs = limbs_to_u64_array(x.as_limbs());
+
+    let mut r = [0u64; 4];
+    r[0] = x_limbs[0] << 1;
+
+    // Shift left by 1 bit with carry propagation
+    for i in 1..4 {
+        r[i] = (x_limbs[i] << 1) | (x_limbs[i - 1] >> 63);
+    }
+
+    // Compute both with and without carry correction
+    let mut a = [0u64; 4];
+    let (a0, ca0) = r[0].overflowing_add(c_lo << 1);
+    a[0] = a0;
+    let mut carry = ca0 as u64;
+
+    for i in 0..4 {
+        let (a_i, ca_i) = r[i].overflowing_add((c_hi << 1) | (c_lo >> 63));
+        let (a_i, ca_ib) = a_i.overflowing_add(carry);
+        a[i] = a_i;
+        carry = (ca_i | ca_ib) as u64;
+    }
+
+    // Select based on carry
+    let carry_mask = (x_limbs[3] >> 63).wrapping_neg();
+    for i in 0..4 {
+        r[i] = (r[i] & !carry_mask) | (a[i] & carry_mask);
+    }
+
+    let mut s = [0u64; 4];
+    let mut b = 0u64;
+
+    for i in 0..4 {
+        let (diff, b1) = r[i].overflowing_sub(modulus_limbs[i]);
+        let (diff, b2) = diff.overflowing_sub(b);
+        s[i] = diff;
+        b = (b1 | b2) as u64;
+    }
+
+    // Select reduced if no borrow
+    let no_borrow_mask = ((b == 0) as u64).wrapping_neg();
+    for i in 0..4 {
+        r[i] = (r[i] & !no_borrow_mask) | (s[i] & no_borrow_mask);
+    }
+
+    u256_from_u64_array(r)
 }
 
 mod helios {

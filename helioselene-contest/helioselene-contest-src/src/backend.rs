@@ -88,12 +88,29 @@ macro_rules! field {
 
         use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess, CtOption};
 
-        use crypto_bigint::{Integer, Limb, Zero};
+        use crypto_bigint::Integer;
 
         use ff::{Field, FieldBits, PrimeField, PrimeFieldBits};
 
         const MODULUS: U256 = U256::from_be_hex($MODULUS_STR);
-        const MODULUS_LIMBS: &[Limb; 4] = MODULUS.as_limbs();
+
+        #[cfg(target_pointer_width = "64")]
+        const MODULUS_LIMBS: &[u64; 4] = {
+            let limbs = MODULUS.as_limbs();
+            &[limbs[0].0, limbs[1].0, limbs[2].0, limbs[3].0]
+        };
+
+        #[cfg(target_pointer_width = "32")]
+        const MODULUS_LIMBS: &[u64; 4] = {
+            let limbs = MODULUS.as_limbs();
+            // Combine pairs of u32 limbs into u64 values
+            &[
+                limbs[0].0 as u64 | ((limbs[1].0 as u64) << 32),
+                limbs[2].0 as u64 | ((limbs[3].0 as u64) << 32),
+                limbs[4].0 as u64 | ((limbs[5].0 as u64) << 32),
+                limbs[6].0 as u64 | ((limbs[7].0 as u64) << 32),
+            ]
+        };
 
         impl ConstantTimeEq for $FieldName {
             fn ct_eq(&self, other: &Self) -> Choice {
@@ -114,67 +131,7 @@ macro_rules! field {
             add,
             AddAssign,
             add_assign,
-            |x: U256, y: U256| {
-                let x_limbs = x.as_limbs();
-                let y_limbs = y.as_limbs();
-
-                let (r0, c0) = x_limbs[0].0.overflowing_add(y_limbs[0].0);
-                let (r1, c1) = x_limbs[1].0.overflowing_add(y_limbs[1].0);
-                let (r1, c1b) = r1.overflowing_add(c0 as u64);
-                let c1 = c1 | c1b;
-
-                let (r2, c2) = x_limbs[2].0.overflowing_add(y_limbs[2].0);
-                let (r2, c2b) = r2.overflowing_add(c1 as u64);
-                let c2 = c2 | c2b;
-
-                let (r3, c3) = x_limbs[3].0.overflowing_add(y_limbs[3].0);
-                let (r3, c3b) = r3.overflowing_add(c2 as u64);
-                let carry = (c3 | c3b) as u64;
-
-                // If carry, add 2c - do it unconditionally then mask
-                let c_doubled_lo = $C_LO << 1;
-                let c_doubled_hi = ($C_HI << 1) | ($C_LO >> 63);
-
-                // Compute both with and without carry correction
-                let (a0, ca0) = r0.overflowing_add(c_doubled_lo);
-                let (a1, ca1) = r1.overflowing_add(c_doubled_hi);
-                let (a1, ca1b) = a1.overflowing_add(ca0 as u64);
-                let ca1_total = (ca1 | ca1b) as u64;
-
-                let (a2, ca2) = r2.overflowing_add(ca1_total);
-                let (a3, _ca3) = r3.overflowing_add(ca2 as u64);
-
-                // Select based on carry
-                let carry_mask = carry.wrapping_neg();
-                let r0 = (r0 & !carry_mask) | (a0 & carry_mask);
-                let r1 = (r1 & !carry_mask) | (a1 & carry_mask);
-                let r2 = (r2 & !carry_mask) | (a2 & carry_mask);
-                let r3 = (r3 & !carry_mask) | (a3 & carry_mask);
-
-                // Final reduction - subtract modulus
-                let (s0, b0) = r0.overflowing_sub(MODULUS_LIMBS[0].0);
-                let (s1, b1) = r1.overflowing_sub(MODULUS_LIMBS[1].0);
-                let (s1, b1b) = s1.overflowing_sub(b0 as u64);
-                let b1_total = (b1 | b1b) as u64;
-
-                let (s2, b2) = r2.overflowing_sub(MODULUS_LIMBS[2].0);
-                let (s2, b2b) = s2.overflowing_sub(b1_total);
-                let b2_total = (b2 | b2b) as u64;
-
-                let (s3, b3) = r3.overflowing_sub(MODULUS_LIMBS[3].0);
-                let (s3, b3b) = s3.overflowing_sub(b2_total);
-                let borrow = (b3 | b3b) as u64;
-
-                // Select reduced if no borrow
-                let no_borrow_mask = ((borrow == 0) as u64).wrapping_neg();
-
-                U256::from_words([
-                    (r0 & !no_borrow_mask) | (s0 & no_borrow_mask),
-                    (r1 & !no_borrow_mask) | (s1 & no_borrow_mask),
-                    (r2 & !no_borrow_mask) | (s2 & no_borrow_mask),
-                    (r3 & !no_borrow_mask) | (s3 & no_borrow_mask),
-                ])
-            }
+            |x: U256, y: U256| f255_add(x, y, $C_LO, $C_HI, MODULUS_LIMBS)
         );
 
         math_op!(
@@ -184,46 +141,7 @@ macro_rules! field {
             sub,
             SubAssign,
             sub_assign,
-            |x: U256, y: U256| {
-                let x_limbs = x.as_limbs();
-                let y_limbs = y.as_limbs();
-
-                let (r0, b0) = x_limbs[0].0.overflowing_sub(y_limbs[0].0);
-
-                let (r1, b1) = x_limbs[1].0.overflowing_sub(y_limbs[1].0);
-                let (r1, b1b) = r1.overflowing_sub(b0 as u64);
-                let b1_total = (b1 | b1b) as u64;
-
-                let (r2, b2) = x_limbs[2].0.overflowing_sub(y_limbs[2].0);
-                let (r2, b2b) = r2.overflowing_sub(b1_total);
-                let b2_total = (b2 | b2b) as u64;
-
-                let (r3, b3) = x_limbs[3].0.overflowing_sub(y_limbs[3].0);
-                let (r3, b3b) = r3.overflowing_sub(b2_total);
-                let borrow = (b3 | b3b) as u64;
-
-                let (a0, c0) = r0.overflowing_add(MODULUS_LIMBS[0].0);
-
-                let (a1, c1) = r1.overflowing_add(MODULUS_LIMBS[1].0);
-                let (a1, c1b) = a1.overflowing_add(c0 as u64);
-                let c1_total = (c1 | c1b) as u64;
-
-                let (a2, c2) = r2.overflowing_add(MODULUS_LIMBS[2].0);
-                let (a2, c2b) = a2.overflowing_add(c1_total);
-                let c2_total = (c2 | c2b) as u64;
-
-                let (a3, _) = r3.overflowing_add(MODULUS_LIMBS[3].0);
-                let (a3, _) = a3.overflowing_add(c2_total);
-
-                let borrow_mask = borrow.wrapping_neg();
-
-                U256::from_words([
-                    (r0 & !borrow_mask) | (a0 & borrow_mask),
-                    (r1 & !borrow_mask) | (a1 & borrow_mask),
-                    (r2 & !borrow_mask) | (a2 & borrow_mask),
-                    (r3 & !borrow_mask) | (a3 & borrow_mask),
-                ])
-            }
+            |x: U256, y: U256| f255_sub(x, y, MODULUS_LIMBS)
         );
 
         math_op!(
@@ -233,169 +151,7 @@ macro_rules! field {
             mul,
             MulAssign,
             mul_assign,
-            |x: U256, y: U256| {
-                let x_limbs = x.as_limbs();
-
-                let x0 = x_limbs[0].0;
-                let x1 = x_limbs[1].0;
-                let x2 = x_limbs[2].0;
-                let x3 = x_limbs[3].0;
-
-                let y_limbs = y.as_limbs();
-
-                let y0 = y_limbs[0].0;
-                let y1 = y_limbs[1].0;
-                let y2 = y_limbs[2].0;
-                let y3 = y_limbs[3].0;
-
-                // Multiply low and high parts
-                let (z0_lo, z0_hi) = mul_wide([x0, x1], [y0, y1]);
-                let (z2_lo, z2_hi) = mul_wide([x2, x3], [y2, y3]);
-
-                // Compute sums for middle part
-                let (x_sum, x_carry) = adc([x0, x1], [x2, x3]);
-                let (y_sum, y_carry) = adc([y0, y1], [y2, y3]);
-
-                // Multiply sums
-                let (z1_temp_lo, z1_temp_hi) = mul_wide(x_sum, y_sum);
-
-                // Build z1 with inline carry corrections
-                let z1_0 = z1_temp_lo[0];
-                let z1_1 = z1_temp_lo[1];
-                let z1_2 = z1_temp_hi[0];
-                let z1_3 = z1_temp_hi[1];
-
-                // NOTE: Constant-time carry corrections
-                let x_carry_mask = (x_carry as u64).wrapping_neg();
-                let y_carry_mask = (y_carry as u64).wrapping_neg();
-                let both_carry_mask = ((x_carry && y_carry) as u64).wrapping_neg();
-
-                // Add y_sum[0] & x_carry_mask at position 2
-                let value = y_sum[0] & x_carry_mask;
-                let (sum, carry) = z1_2.overflowing_add(value);
-                let z1_2 = sum;
-                let (sum, carry) = z1_3.overflowing_add(carry as u64);
-                let z1_3 = sum;
-                let z1_4 = carry as u64;
-
-                // Add y_sum[1] & x_carry_mask at position 3
-                let value = y_sum[1] & x_carry_mask;
-                let (sum, carry) = z1_3.overflowing_add(value);
-                let z1_3 = sum;
-                let (sum, carry) = z1_4.overflowing_add(carry as u64);
-                let z1_4 = sum;
-                let z1_5 = carry as u64;
-
-                // Add x_sum[0] & y_carry_mask at position 2
-                let value = x_sum[0] & y_carry_mask;
-                let (sum, carry) = z1_2.overflowing_add(value);
-                let z1_2 = sum;
-                let (sum, carry) = z1_3.overflowing_add(carry as u64);
-                let z1_3 = sum;
-                let (sum, carry) = z1_4.overflowing_add(carry as u64);
-                let z1_4 = sum;
-                let (sum, _carry) = z1_5.overflowing_add(carry as u64);
-                let z1_5 = sum;
-
-                // Add x_sum[1] & y_carry_mask at position 3
-                let value = x_sum[1] & y_carry_mask;
-                let (sum, carry) = z1_3.overflowing_add(value);
-                let z1_3 = sum;
-                let (sum, carry) = z1_4.overflowing_add(carry as u64);
-                let z1_4 = sum;
-                let (sum, _carry) = z1_5.overflowing_add(carry as u64);
-                let z1_5 = sum;
-
-                // Add both_carry at position 4
-                let value = both_carry_mask & 1;
-                let (sum, carry) = z1_4.overflowing_add(value);
-                let z1_4 = sum;
-                let (sum, _carry) = z1_5.overflowing_add(carry as u64);
-                let z1_5 = sum;
-
-                // NOTE: Compute z1 = z1_temp - z0 - z2
-                // First subtraction: z1 -= z0
-                let (val, borrow) = z1_0.overflowing_sub(z0_lo[0]);
-                let z1_0 = val;
-
-                let (diff, b) = z1_1.overflowing_sub(z0_lo[1]);
-                let (val, b2) = diff.overflowing_sub(borrow as u64);
-                let z1_1 = val;
-                let borrow = b | b2;
-
-                let (diff, b) = z1_2.overflowing_sub(z0_hi[0]);
-                let (val, b2) = diff.overflowing_sub(borrow as u64);
-                let z1_2 = val;
-                let borrow = b | b2;
-
-                let (diff, b) = z1_3.overflowing_sub(z0_hi[1]);
-                let (val, b2) = diff.overflowing_sub(borrow as u64);
-                let z1_3 = val;
-                let borrow = b | b2;
-
-                let (val, borrow) = z1_4.overflowing_sub(borrow as u64);
-                let z1_4 = val;
-                let (val, _borrow) = z1_5.overflowing_sub(borrow as u64);
-                let z1_5 = val;
-
-                // Second subtraction: z1 -= z2
-                let (val, borrow) = z1_0.overflowing_sub(z2_lo[0]);
-                let z1_0 = val;
-
-                let (diff, b) = z1_1.overflowing_sub(z2_lo[1]);
-                let (val, b2) = diff.overflowing_sub(borrow as u64);
-                let z1_1 = val;
-                let borrow = b | b2;
-
-                let (diff, b) = z1_2.overflowing_sub(z2_hi[0]);
-                let (val, b2) = diff.overflowing_sub(borrow as u64);
-                let z1_2 = val;
-                let borrow = b | b2;
-
-                let (diff, b) = z1_3.overflowing_sub(z2_hi[1]);
-                let (val, b2) = diff.overflowing_sub(borrow as u64);
-                let z1_3 = val;
-                let borrow = b | b2;
-
-                let (val, borrow) = z1_4.overflowing_sub(borrow as u64);
-                let z1_4 = val;
-                let (val, _borrow) = z1_5.overflowing_sub(borrow as u64);
-                let z1_5 = val;
-
-                // Add z0
-                let r0 = z0_lo[0];
-                let r1 = z0_lo[1];
-
-                // NOTE: Add z1 << 128 (shift by 2 limbs)
-                let (r2, carry) = z0_hi[0].overflowing_add(z1_0);
-                let (r3, c) = z0_hi[1].overflowing_add(z1_1);
-                let (r3, c2) = r3.overflowing_add(carry as u64);
-                let carry = (c | c2) as u64;
-
-                let r4 = z1_2 + carry;
-                let r5 = z1_3;
-                let r6 = z1_4;
-                let r7 = z1_5;
-
-                // Add z2 << 256 (shift by 4 limbs)
-                let (r4, carry) = r4.overflowing_add(z2_lo[0]);
-                let (r5, c) = r5.overflowing_add(z2_lo[1]);
-                let (r5, c2) = r5.overflowing_add(carry as u64);
-                let carry = (c | c2) as u64;
-
-                let (r6, c) = r6.overflowing_add(z2_hi[0]);
-                let (r6, c2) = r6.overflowing_add(carry as u64);
-                let carry = (c | c2) as u64;
-
-                let r7 = r7.wrapping_add(z2_hi[1]).wrapping_add(carry);
-
-                reduce_limbs(
-                    [r0, r1, r2, r3, r4, r5, r6, r7],
-                    $C_LO,
-                    $C_HI,
-                    MODULUS_LIMBS,
-                )
-            }
+            |x: U256, y: U256| f255_mul(x, y, $C_LO, $C_HI, MODULUS_LIMBS)
         );
 
         from_wrapper!($FieldName, U256, u8);
@@ -407,35 +163,7 @@ macro_rules! field {
         impl Neg for $FieldName {
             type Output = $FieldName;
             fn neg(self) -> $FieldName {
-                // Special case: -0 = 0
-                let is_zero = self.0.is_zero();
-                let zero_mask = is_zero.unwrap_u8() as u64;
-                let zero_mask = zero_mask.wrapping_neg();
-
-                let x_limbs = self.0.as_limbs();
-
-                // When subtracting from 0, we always borrow (except for zero)
-                // So we compute MODULUS - self directly
-                let (r0, b0) = MODULUS_LIMBS[0].0.overflowing_sub(x_limbs[0].0);
-
-                let (r1, b1) = MODULUS_LIMBS[1].0.overflowing_sub(x_limbs[1].0);
-                let (r1, b1b) = r1.overflowing_sub(b0 as u64);
-                let b1_total = (b1 | b1b) as u64;
-
-                let (r2, b2) = MODULUS_LIMBS[2].0.overflowing_sub(x_limbs[2].0);
-                let (r2, b2b) = r2.overflowing_sub(b1_total);
-                let b2_total = (b2 | b2b) as u64;
-
-                let r3 = MODULUS_LIMBS[3].0.wrapping_sub(x_limbs[3].0);
-                let r3 = r3.wrapping_sub(b2_total);
-
-                // Return 0 if input was 0, otherwise return the result
-                Self(U256::from_words([
-                    r0 & !zero_mask,
-                    r1 & !zero_mask,
-                    r2 & !zero_mask,
-                    r3 & !zero_mask,
-                ]))
+                Self(f255_neg(self.0, MODULUS_LIMBS))
             }
         }
 
@@ -449,11 +177,11 @@ macro_rules! field {
         impl $FieldName {
             /// Perform an exponentiation.
             pub fn pow(&self, other: $FieldName) -> $FieldName {
-                let mut table = [$FieldName::ONE; TABLE_SIZE];
+                let mut table = [$FieldName::ONE; 16];
                 table[1] = *self;
                 table[2] = self.square();
 
-                for i in 3..TABLE_SIZE {
+                for i in 3..16 {
                     table[i] = $FieldName::conditional_select(
                         &(table[i - 1] * self),
                         &table[i / 2].square(),
@@ -483,7 +211,7 @@ macro_rules! field {
 
                     // Constant-time table lookup
                     let mut acc = table[0];
-                    for i in 0..TABLE_SIZE {
+                    for i in 0..16 {
                         acc = Self::conditional_select(
                             &acc,
                             &table[i],
@@ -512,143 +240,12 @@ macro_rules! field {
                 ))
             }
 
-            /// Karatsuba squaring with integrated Crandall reduction
-            /// Optimized for 256-bit (4 limb) squaring
             fn square(&self) -> Self {
-                let x_limbs = self.0.as_limbs();
-
-                let x0 = x_limbs[0].0;
-                let x1 = x_limbs[1].0;
-                let x2 = x_limbs[2].0;
-                let x3 = x_limbs[3].0;
-
-                // Square low part: z0 = x_lo²
-                let (z0_lo, z0_hi) = square_wide([x0, x1]);
-
-                // Square high part: z2 = x_hi²
-                let (z2_lo, z2_hi) = square_wide([x2, x3]);
-
-                // Compute x_lo * x_hi for middle term (will be doubled)
-                let (z1_lo, z1_hi) = mul_wide([x0, x1], [x2, x3]);
-
-                // Add z0 (bits 0-255)
-                let r0 = z0_lo[0];
-                let r1 = z0_lo[1];
-                let r2 = z0_hi[0];
-                let r3 = z0_hi[1];
-
-                // Add z2 << 256 (bits 256-511)
-                let r4 = z2_lo[0];
-                let r5 = z2_lo[1];
-                let r6 = z2_hi[0];
-                let r7 = z2_hi[1];
-
-                // Add 2*z1 << 128 (shift by 2 limbs)
-                // Extract z1 values once
-                let z1_0 = z1_lo[0];
-                let z1_1 = z1_lo[1];
-                let z1_2 = z1_hi[0];
-                let z1_3 = z1_hi[1];
-
-                // Double and add z1 with carry propagation
-                let carry = 0u64;
-
-                // Add 2*z1[0] to r2
-                let doubled = (z1_0 as u128) << 1;
-                let sum = (r2 as u128) + (doubled as u64 as u128) + carry as u128;
-                let r2 = sum as u64;
-                let carry = (doubled >> 64) as u64 + (sum >> 64) as u64;
-
-                // Add 2*z1[1] to r3
-                let doubled = (z1_1 as u128) << 1;
-                let sum = (r3 as u128) + (doubled as u64 as u128) + carry as u128;
-                let r3 = sum as u64;
-                let carry = (doubled >> 64) as u64 + (sum >> 64) as u64;
-
-                // Add 2*z1[2] to r4
-                let doubled = (z1_2 as u128) << 1;
-                let sum = (r4 as u128) + (doubled as u64 as u128) + carry as u128;
-                let r4 = sum as u64;
-                let carry = (doubled >> 64) as u64 + (sum >> 64) as u64;
-
-                // Add 2*z1[3] to r5
-                let doubled = (z1_3 as u128) << 1;
-                let sum = (r5 as u128) + (doubled as u64 as u128) + carry as u128;
-                let r5 = sum as u64;
-                let carry = (doubled >> 64) as u64 + (sum >> 64) as u64;
-
-                // Propagate remaining carry
-                let (sum, c) = r6.overflowing_add(carry);
-                let r6 = sum;
-                let c_mask = (c as u64).wrapping_neg();
-                let r7 = r7.wrapping_add(c_mask & 1);
-
-                Self(reduce_limbs(
-                    [r0, r1, r2, r3, r4, r5, r6, r7],
-                    $C_LO,
-                    $C_HI,
-                    MODULUS_LIMBS,
-                ))
+                Self(f255_square(self.0, $C_LO, $C_HI, MODULUS_LIMBS))
             }
 
             fn double(&self) -> Self {
-                let x_limbs = self.0.as_limbs();
-
-                // Shift left by 1 bit with carry propagation (unrolled)
-                let r0 = x_limbs[0].0 << 1;
-                let carry0 = x_limbs[0].0 >> 63;
-
-                let r1 = (x_limbs[1].0 << 1) | carry0;
-                let carry1 = x_limbs[1].0 >> 63;
-
-                let r2 = (x_limbs[2].0 << 1) | carry1;
-                let carry2 = x_limbs[2].0 >> 63;
-
-                let r3 = (x_limbs[3].0 << 1) | carry2;
-                let carry = x_limbs[3].0 >> 63;
-
-                let c_doubled_lo = $C_LO << 1;
-                let c_doubled_hi = ($C_HI << 1) | ($C_LO >> 63);
-
-                // Compute both with and without carry correction
-                let (a0, ca0) = r0.overflowing_add(c_doubled_lo);
-                let (a1, ca1) = r1.overflowing_add(c_doubled_hi);
-                let (a1, ca1b) = a1.overflowing_add(ca0 as u64);
-                let ca1_total = (ca1 | ca1b) as u64;
-
-                let (a2, ca2) = r2.overflowing_add(ca1_total);
-                let (a3, _ca3) = r3.overflowing_add(ca2 as u64);
-
-                // Select based on carry
-                let carry_mask = carry.wrapping_neg();
-                let r0 = (r0 & !carry_mask) | (a0 & carry_mask);
-                let r1 = (r1 & !carry_mask) | (a1 & carry_mask);
-                let r2 = (r2 & !carry_mask) | (a2 & carry_mask);
-                let r3 = (r3 & !carry_mask) | (a3 & carry_mask);
-
-                // Final reduction - subtract modulus
-                let (s0, b0) = r0.overflowing_sub(MODULUS_LIMBS[0].0);
-                let (s1, b1) = r1.overflowing_sub(MODULUS_LIMBS[1].0);
-                let (s1, b1b) = s1.overflowing_sub(b0 as u64);
-                let b1_total = (b1 | b1b) as u64;
-
-                let (s2, b2) = r2.overflowing_sub(MODULUS_LIMBS[2].0);
-                let (s2, b2b) = s2.overflowing_sub(b1_total);
-                let b2_total = (b2 | b2b) as u64;
-
-                let (s3, b3) = r3.overflowing_sub(MODULUS_LIMBS[3].0);
-                let (s3, b3b) = s3.overflowing_sub(b2_total);
-                let borrow = (b3 | b3b) as u64;
-
-                // Select reduced if no borrow
-                let no_borrow_mask = ((borrow == 0) as u64).wrapping_neg();
-
-                Self(U256::from_words([
-                    (r0 & !no_borrow_mask) | (s0 & no_borrow_mask),
-                    (r1 & !no_borrow_mask) | (s1 & no_borrow_mask),
-                    (r2 & !no_borrow_mask) | (s2 & no_borrow_mask),
-                    (r3 & !no_borrow_mask) | (s3 & no_borrow_mask),
-                ]))
+                Self(f255_double(self.0, $C_LO, $C_HI, MODULUS_LIMBS))
             }
 
             fn invert(&self) -> CtOption<Self> {
