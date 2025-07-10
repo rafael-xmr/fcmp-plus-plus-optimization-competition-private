@@ -226,8 +226,8 @@ macro_rules! field {
             }
 
             fn invert(&self) -> CtOption<Self> {
-                let inv = helioselene_inverse(self.0);
-                CtOption::new(Self(inv), inv.ct_ne(&U256::ZERO))
+                let (inv, exists) = self.0.inv_odd_mod(&MODULUS);
+                CtOption::new($FieldName(inv), exists.into())
             }
 
             fn sqrt(&self) -> CtOption<Self> {
