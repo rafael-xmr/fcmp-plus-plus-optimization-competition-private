@@ -293,7 +293,7 @@ fn reduce_crandall_final(a: [u64; 4]) -> U256 {
 
 /// Performs field addition `x + y mod p`.
 #[inline(always)]
-fn helioselene_add(x: U256, y: U256, lazy_reduce: bool) -> U256 {
+fn helioselene_add(x: U256, y: U256) -> U256 {
     let x_limbs = limbs_to_u64_array(x.as_limbs());
     let y_limbs = limbs_to_u64_array(y.as_limbs());
 
@@ -319,16 +319,12 @@ fn helioselene_add(x: U256, y: U256, lazy_reduce: bool) -> U256 {
         r[i] = (r[i] & !carry_mask) | (a[i] & carry_mask);
     }
 
-    if lazy_reduce {
-        return u256_from_u64_array(r);
-    }
-
     reduce_crandall_final(r)
 }
 
 /// Performs field doubling `x + x mod p`.
 #[inline(always)]
-fn helioselene_double(x: U256, lazy_reduce: bool) -> U256 {
+fn helioselene_double(x: U256) -> U256 {
     let x_limbs = limbs_to_u64_array(x.as_limbs());
 
     let mut r = [0u64; 4];
@@ -356,10 +352,6 @@ fn helioselene_double(x: U256, lazy_reduce: bool) -> U256 {
     let carry_mask = (x_limbs[3] >> 63).wrapping_neg();
     for i in 0..4 {
         r[i] = (r[i] & !carry_mask) | (a[i] & carry_mask);
-    }
-
-    if lazy_reduce {
-        return u256_from_u64_array(r);
     }
 
     reduce_crandall_final(r)
@@ -399,7 +391,7 @@ fn helioselene_sub(x: U256, y: U256) -> U256 {
 
 /// Performs field multiplication `x * y mod p`.
 #[inline(always)]
-fn helioselene_mul(x: U256, y: U256, lazy_reduce: bool) -> U256 {
+fn helioselene_mul(x: U256, y: U256) -> U256 {
     let x_limbs = limbs_to_u64_array(x.as_limbs());
     let y_limbs = limbs_to_u64_array(y.as_limbs());
 
@@ -410,10 +402,6 @@ fn helioselene_mul(x: U256, y: U256, lazy_reduce: bool) -> U256 {
             (r[i + j], carry) = muladdcarry(x_limbs[i], y_limbs[j], r[i + j], carry);
         }
         r[i + 4] = carry;
-    }
-
-    if lazy_reduce {
-        return u256_from_u64_array(reduce_512_lazy(r));
     }
 
     reduce_crandall_full(r)
@@ -442,7 +430,7 @@ fn helioselene_neg(x: U256) -> U256 {
 
 /// Performs field squaring `x * x mod p`.
 #[inline(always)]
-fn helioselene_square(x: U256, lazy_reduce: bool) -> U256 {
+fn helioselene_square(x: U256) -> U256 {
     let x_limbs = limbs_to_u64_array(x.as_limbs());
 
     // Karatsuba-style squaring to get a 512-bit result
@@ -465,10 +453,6 @@ fn helioselene_square(x: U256, lazy_reduce: bool) -> U256 {
     let r7 = z2_hi[1] + c;
 
     let r = [z0_lo[0], z0_lo[1], r2, r3, r4, r5, r6, r7];
-
-    if lazy_reduce {
-        return u256_from_u64_array(reduce_512_lazy(r));
-    }
 
     reduce_crandall_full(r)
 }
@@ -940,33 +924,6 @@ field!(
     "7fffffffffffffffffffffffffffffffbf7f782cb7656b586eb6d2727927c79e",
     "0000000000000000000000000000000000000000000000000000000000000019",
 );
-
-impl HelioseleneField {
-    /// Performs addition with a partial reduction. The result may not be fully reduced.
-    pub fn lazy_add(&self, other: &HelioseleneField) -> HelioseleneField {
-        HelioseleneField(helioselene_add(self.0, other.0, true))
-    }
-
-    /// Performs multiplication with a partial reduction. The result may not be fully reduced.
-    pub fn lazy_mul(&self, other: &HelioseleneField) -> HelioseleneField {
-        HelioseleneField(helioselene_mul(self.0, other.0, true))
-    }
-
-    /// Performs squaring with a partial reduction. The result may not be fully reduced.
-    pub fn lazy_square(&self) -> HelioseleneField {
-        HelioseleneField(helioselene_square(self.0, true))
-    }
-
-    /// Performs doubling with a partial reduction. The result may not be fully reduced.
-    pub fn lazy_double(&self) -> HelioseleneField {
-        HelioseleneField(helioselene_double(self.0, true))
-    }
-
-    /// Performs a final reduction on a field element.
-    pub fn lazy_reduce(&self) -> HelioseleneField {
-        HelioseleneField(reduce_crandall_final(limbs_to_u64_array(self.0.as_limbs())))
-    }
-}
 
 #[test]
 fn test_helioselene_field() {

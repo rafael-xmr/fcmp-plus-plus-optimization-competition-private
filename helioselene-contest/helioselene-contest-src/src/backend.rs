@@ -108,7 +108,7 @@ macro_rules! field {
             add,
             AddAssign,
             add_assign,
-            |x: U256, y: U256| helioselene_add(x, y, false)
+            |x: U256, y: U256| helioselene_add(x, y)
         );
 
         math_op!(
@@ -128,7 +128,7 @@ macro_rules! field {
             mul,
             MulAssign,
             mul_assign,
-            |x: U256, y: U256| helioselene_mul(x, y, false)
+            |x: U256, y: U256| helioselene_mul(x, y)
         );
 
         from_wrapper!($FieldName, U256, u8);
@@ -153,8 +153,6 @@ macro_rules! field {
 
         impl $FieldName {
             /// Perform an exponentiation using a 4-bit fixed-window algorithm.
-            /// This implementation uses lazy reduction for intermediate squarings
-            /// and multiplications for performance.
             pub fn pow(&self, other: $FieldName) -> $FieldName {
                 let mut table = [$FieldName::ONE; 16];
                 table[1] = *self;
@@ -173,9 +171,8 @@ macro_rules! field {
 
                 for window_idx in (0..64).rev() {
                     // Square 4 times (except for the last window)
-                    // Use lazy squaring for performance
                     if window_idx != 63 {
-                        res = res.lazy_square().lazy_square().lazy_square().lazy_square();
+                        res = res.square().square().square().square();
                     }
 
                     // Extract 4-bit window value
@@ -199,11 +196,10 @@ macro_rules! field {
                         );
                     }
 
-                    // Use lazy multiplication for performance
-                    res = Self::conditional_select(&res, &res.lazy_mul(&acc), window_val.ct_ne(&0));
+                    res = Self::conditional_select(&res, &(res * acc), window_val.ct_ne(&0));
                 }
 
-                res.lazy_reduce()
+                res
             }
         }
 
@@ -218,11 +214,11 @@ macro_rules! field {
             }
 
             fn square(&self) -> Self {
-                Self(helioselene_square(self.0, false))
+                Self(helioselene_square(self.0))
             }
 
             fn double(&self) -> Self {
-                Self(helioselene_double(self.0, false))
+                Self(helioselene_double(self.0))
             }
 
             fn invert(&self) -> CtOption<Self> {

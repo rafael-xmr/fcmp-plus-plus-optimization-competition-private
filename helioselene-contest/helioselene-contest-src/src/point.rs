@@ -19,72 +19,6 @@ use group::{
 use crate::{backend::u8_from_bool, field::HelioseleneField};
 use dalek_ff_group::FieldElement as Field25519;
 
-/// A trait abstracting the ability to perform lazy modular arithmetic.
-pub trait LazyReduce: Field {
-    fn lazy_add(&self, other: &Self) -> Self;
-    fn lazy_mul(&self, other: &Self) -> Self;
-    fn lazy_square(&self) -> Self;
-    fn lazy_double(&self) -> Self;
-    fn lazy_reduce(&self) -> Self;
-}
-
-/// The optimized implementation for our custom field.
-impl LazyReduce for HelioseleneField {
-    #[inline(always)]
-    fn lazy_add(&self, other: &Self) -> Self {
-        self.lazy_add(other)
-    }
-
-    #[inline(always)]
-    fn lazy_mul(&self, other: &Self) -> Self {
-        self.lazy_mul(other)
-    }
-
-    #[inline(always)]
-    fn lazy_square(&self) -> Self {
-        self.lazy_square()
-    }
-
-    #[inline(always)]
-    fn lazy_double(&self) -> Self {
-        self.lazy_double()
-    }
-
-    #[inline(always)]
-    fn lazy_reduce(&self) -> Self {
-        self.lazy_reduce()
-    }
-}
-
-/// The fallback implementation for the external field type.
-/// The "lazy" operations are simply the normal, fully-reducing ones.
-impl LazyReduce for Field25519 {
-    #[inline(always)]
-    fn lazy_add(&self, other: &Self) -> Self {
-        *self + *other
-    }
-
-    #[inline(always)]
-    fn lazy_mul(&self, other: &Self) -> Self {
-        *self * *other
-    }
-
-    #[inline(always)]
-    fn lazy_square(&self) -> Self {
-        self.square()
-    }
-
-    #[inline(always)]
-    fn lazy_double(&self) -> Self {
-        self.double()
-    }
-
-    #[inline(always)]
-    fn lazy_reduce(&self) -> Self {
-        *self
-    }
-}
-
 macro_rules! curve {
     (
     $Scalar: ident,
@@ -101,9 +35,7 @@ macro_rules! curve {
 
         fn recover_y(x: $Field) -> CtOption<$Field> {
             // x**3 + -3x + B
-            (((x.lazy_square().lazy_mul(&x)) - x - x - x).lazy_add(&B))
-                .lazy_reduce()
-                .sqrt()
+            (((x.square() * x) - x - x - x) + B).sqrt()
         }
 
         /// Point.
@@ -165,24 +97,24 @@ macro_rules! curve {
                 let t0 = X1 * X2;
                 let t1 = Y1 * Y2;
                 let t2 = Z1 * Z2;
-                let t3 = X1.lazy_add(&Y1).lazy_mul(&X2.lazy_add(&Y2)) - (t0 + t1);
-                let t4 = Y1.lazy_add(&Z1).lazy_mul(&(Y2.lazy_add(&Z2))) - (t1 + t2);
+                let t3 = (X1 + Y1) * (X2 + Y2) - (t0 + t1);
+                let t4 = (Y1 + Z1) * (Y2 + Z2) - (t1 + t2);
 
-                let Y3 = X1.lazy_add(&Z1).lazy_mul(&(X2 + Z2)).lazy_reduce() - (t0 + t2);
+                let Y3 = (X1 + Z1) * (X2 + Z2) - (t0 + t2);
                 let X3 = Y3 - B * t2;
-                let X3 = X3.lazy_double().lazy_add(&X3).lazy_reduce();
+                let X3 = X3.double() + X3;
                 let Z3 = t1 - X3;
 
-                let X3 = t1.lazy_add(&X3);
-                let t2 = t2.lazy_double().lazy_add(&t2).lazy_reduce();
+                let X3 = t1 + X3;
+                let t2 = t2.double() + t2;
                 let Y3 = (B * Y3 - t2) - t0;
-                let Y3 = Y3.lazy_double().lazy_add(&Y3);
-                let t0 = (t0.lazy_double().lazy_add(&t0)) - t2;
+                let Y3 = Y3.double() + Y3;
+                let t0 = (t0.double() + t0) - t2;
 
                 $Point {
-                    x: t3.lazy_mul(&X3) - t4.lazy_mul(&Y3).lazy_reduce(),
-                    y: X3.lazy_mul(&Z3).lazy_add(&t0.lazy_mul(&Y3)).lazy_reduce(),
-                    z: (t4.lazy_mul(&Z3)).lazy_add(&t3.lazy_mul(&t0)).lazy_reduce(),
+                    x: t3 * X3 - t4 * Y3,
+                    y: X3 * Z3 + t0 * Y3,
+                    z: t4 * Z3 + t3 * t0,
                 }
             }
         }
@@ -277,18 +209,18 @@ macro_rules! curve {
                 let Y1 = self.y;
                 let Z1 = self.z;
 
-                let w = (X1 - Z1) * (X1.lazy_add(&Z1));
-                let w = w.lazy_double() + w;
+                let w = (X1 - Z1) * (X1 + Z1);
+                let w = w.double() + w;
                 let s = (Y1 * Z1).double();
-                let R = Y1.lazy_mul(&s);
+                let R = Y1 * s;
                 let B_ = (X1 * R).double();
                 let h = w.square() - &B_.double();
 
                 Self::conditional_select(
                     &Self {
-                        x: h.lazy_mul(&s).lazy_reduce(),
-                        y: (w.lazy_mul(&(B_ - &h)) - &R.square().double()),
-                        z: s * s.lazy_square(),
+                        x: h * s,
+                        y: (w * (B_ - &h) - &R.square().double()),
+                        z: s * s.square(),
                     },
                     &Self::identity(),
                     self.is_identity(),
