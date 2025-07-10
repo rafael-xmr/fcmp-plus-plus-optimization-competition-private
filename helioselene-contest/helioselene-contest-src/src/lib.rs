@@ -4,6 +4,8 @@
 
 pub use group;
 
+mod inverse;
+
 #[macro_use]
 mod backend;
 
